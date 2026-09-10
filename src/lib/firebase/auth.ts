@@ -6,9 +6,14 @@ import {
   type Auth,
   type Unsubscribe,
   type User,
+  // getReactNativePersistence firebase v12'nin "firebase/auth" tiplerinde yok ama
+  // Metro'nun "react-native" export koşuluyla çözülen çalışma zamanı sürümünde var
+  // (bkz. firebase-js-sdk #9316). "firebase/auth/react-native" diye ayrı bir alt-yol
+  // YOK — onu import etmeye çalışmak Metro'da "Unable to resolve" hatası veriyordu.
+  initializeAuth,
+  // @ts-expect-error — bkz. yukarıdaki not
+  getReactNativePersistence,
 } from "firebase/auth";
-// @ts-expect-error — firebase/auth/react-native tip tanımları eksik ama runtime'da var (bkz. firebase-js-sdk #9316).
-import { initializeAuth, getReactNativePersistence } from "firebase/auth/react-native";
 import { getApps, initializeApp } from "firebase/app";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { firebaseConfig, isFirebaseConfigured } from "./config";
