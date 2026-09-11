@@ -1,6 +1,7 @@
 import "@/global.css";
 
 import { ActivityIndicator, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
 import AppProviders from "@/components/AppProviders";
 import { useAppSelector } from "@/lib/redux/hooks";
@@ -40,8 +41,10 @@ function RootNavigation() {
 
 export default function RootLayout() {
   return (
-    <AppProviders>
-      <RootNavigation />
-    </AppProviders>
+    <SafeAreaProvider>
+      <AppProviders>
+        <RootNavigation />
+      </AppProviders>
+    </SafeAreaProvider>
   );
 }
