@@ -1,4 +1,5 @@
 import { ScrollView, Text, View, Pressable } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Star } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { toggleFavorite } from "@/lib/redux/favoritesSlice";
@@ -23,7 +24,8 @@ export default function FavoritesScreen() {
   const favoriteChats = history.filter((entry) => entry.isFavorite);
 
   return (
-    <ScrollView className="flex-1 bg-surface-warm" contentContainerClassName="gap-6 p-4 pb-10">
+    <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
+    <ScrollView contentContainerClassName="gap-6 p-4 pb-10">
       <Text className="text-center text-2xl font-bold text-brand-red">Favoriler</Text>
 
       <View className="gap-3 rounded-2xl bg-surface-card p-5 shadow-sm">
@@ -73,5 +75,6 @@ export default function FavoritesScreen() {
         </View>
       )}
     </ScrollView>
+    </SafeAreaView>
   );
 }

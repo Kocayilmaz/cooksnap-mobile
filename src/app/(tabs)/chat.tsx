@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { Camera, Send, X } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
@@ -163,7 +164,8 @@ export default function ChatScreen() {
 
   if (hasStartedChat) {
     return (
-      <KeyboardAvoidingView className="flex-1 bg-surface-warm" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
+    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView className="flex-1" contentContainerClassName="gap-3 p-4">
           {messages.map((message) =>
             message.role === "user" ? (
@@ -205,11 +207,13 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      </SafeAreaView>
     );
   }
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-surface-warm" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
+    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerClassName="gap-6 p-4 pb-10">
         <View className="gap-1">
           <Text className="text-center text-2xl font-semibold text-brand-red">CookSnap</Text>
@@ -274,5 +278,6 @@ export default function ChatScreen() {
         {error && <Text className="text-center text-sm text-state-error">{error}</Text>}
       </ScrollView>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Lock, Mail, User } from "lucide-react-native";
 import { useAppDispatch } from "@/lib/redux/hooks";
 import { getFirebaseAuth, signInWithEmail, signUpWithEmail } from "@/lib/firebase/auth";
@@ -50,8 +51,9 @@ export default function LoginScreen() {
   }
 
   return (
+    <SafeAreaView className="flex-1 bg-surface-warm">
     <KeyboardAvoidingView
-      className="flex-1 bg-surface-warm"
+      className="flex-1"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView contentContainerClassName="flex-1 items-center justify-center px-6 py-12" keyboardShouldPersistTaps="handled">
@@ -147,5 +149,6 @@ export default function LoginScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
