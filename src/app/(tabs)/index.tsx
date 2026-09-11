@@ -6,6 +6,7 @@ import { Clock, MessageCircle, Star } from "lucide-react-native";
 import { useAppSelector } from "@/lib/redux/hooks";
 import { EQUIPMENT_LABELS } from "@/lib/redux/equipmentSlice";
 import { Colors } from "@/constants/theme";
+import IngredientPicker from "@/components/IngredientPicker";
 
 const RECENT_PREVIEW_COUNT = 3;
 
@@ -58,6 +59,8 @@ export default function HomeScreen() {
             <Text className="text-sm font-semibold text-brand-red">Sohbete Başla</Text>
           </Pressable>
         </LinearGradient>
+
+        <IngredientPicker />
 
       {recentHistory.length > 0 && (
         <View className="gap-2 rounded-2xl bg-surface-card p-5 shadow-sm">

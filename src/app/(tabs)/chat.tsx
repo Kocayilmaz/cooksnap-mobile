@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Camera, Send, X } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
@@ -36,6 +37,10 @@ function makeMessageId(): string {
  * ekranı (Profil) da henüz yok, o yüzden şu an her zaman ücretsiz mod.
  */
 export default function ChatScreen() {
+  // Anasayfadaki IngredientPicker /chat'e { ingredients } param'ıyla
+  // yönlendiriyor (bkz. components/IngredientPicker.tsx) — web'deki
+  // /chat?ingredients=... ile aynı akış.
+  const params = useLocalSearchParams<{ ingredients?: string }>();
   const dispatch = useAppDispatch();
   const equipmentState = useAppSelector((state) => state.equipment);
   const personCount = useAppSelector((state) => state.personCount.value);
@@ -46,7 +51,7 @@ export default function ChatScreen() {
   const limitReached = isFreeMode && usageCount >= FREE_USAGE_LIMIT;
 
   const [photo, setPhoto] = useState<string | null>(null);
-  const [ingredientsText, setIngredientsText] = useState("");
+  const [ingredientsText, setIngredientsText] = useState(() => params.ingredients ?? "");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
