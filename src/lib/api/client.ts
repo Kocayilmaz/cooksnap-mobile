@@ -1,5 +1,5 @@
 import type { ApiErrorResponse, RecipeRequest, RecipeResponse } from "@/lib/types/recipe";
-import type { MealSearchResult } from "@/lib/types/meal";
+import type { MealCategory, MealDetail, MealSearchResult } from "@/lib/types/meal";
 
 /**
  * Ortak backend: ayrı bir sunucu değil, ne-pisirsem'in zaten Vercel'de canlı
@@ -34,4 +34,20 @@ export async function searchMeals(query: string): Promise<MealSearchResult[]> {
   const response = await fetch(`${API_BASE_URL}/api/meals/search?q=${encodeURIComponent(query)}`);
   const data = await parseErrorOr<{ meals: MealSearchResult[] }>(response);
   return data.meals;
+}
+
+export interface MealHomeSection {
+  categoryName: string;
+  meals: MealSearchResult[];
+}
+
+export async function getHomeMealSections(): Promise<{ categories: MealCategory[]; sections: MealHomeSection[] }> {
+  const response = await fetch(`${API_BASE_URL}/api/meals/home-sections`);
+  return parseErrorOr<{ categories: MealCategory[]; sections: MealHomeSection[] }>(response);
+}
+
+export async function getMealDetail(id: string): Promise<MealDetail> {
+  const response = await fetch(`${API_BASE_URL}/api/meals/detail?id=${encodeURIComponent(id)}`);
+  const data = await parseErrorOr<{ meal: MealDetail }>(response);
+  return data.meal;
 }
