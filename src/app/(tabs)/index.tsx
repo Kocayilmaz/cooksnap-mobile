@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -5,8 +6,13 @@ import { useRouter } from "expo-router";
 import { Clock, MessageCircle, Star } from "lucide-react-native";
 import { useAppSelector } from "@/lib/redux/hooks";
 import { EQUIPMENT_LABELS } from "@/lib/redux/equipmentSlice";
+import { getCategoryLabel } from "@/lib/mealdb/categoryMeta";
+import { getHomeMealSections, type MealHomeSection } from "@/lib/api/client";
 import { Colors } from "@/constants/theme";
 import IngredientPicker from "@/components/IngredientPicker";
+import CategoryNav from "@/components/CategoryNav";
+import MealCard from "@/components/MealCard";
+import type { MealCategory } from "@/lib/types/meal";
 
 const RECENT_PREVIEW_COUNT = 3;
 
@@ -29,9 +35,41 @@ export default function HomeScreen() {
     .sort((a, b) => b.savedAt - a.savedAt)
     .slice(0, RECENT_PREVIEW_COUNT);
 
+  // Kategori bölümü — ne-pisirsem'in app/page.tsx'teki server-side veri
+  // birleştirmesini (kendi Firestore tarifleri + TheMealDB + Spoonacular)
+  // ortak /api/meals/home-sections endpoint'inden tek istekle çekiyor (bkz.
+  // ne-pisirsem app/api/meals/home-sections/route.ts).
+  const [categories, setCategories] = useState<MealCategory[]>([]);
+  const [sections, setSections] = useState<MealHomeSection[]>([]);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const sectionOffsets = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    getHomeMealSections()
+      .then((data) => {
+        if (!isMounted) return;
+        setCategories(data.categories);
+        setSections(data.sections.filter((section) => section.meals.length > 0));
+      })
+      .catch(() => {
+        // best-effort — kategori bölümü olmadan da anasayfa kullanılabilir kalır.
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  function scrollToCategory(categoryName: string) {
+    const y = sectionOffsets.current[categoryName];
+    if (y !== undefined) {
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
+    }
+  }
+
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
-      <ScrollView contentContainerClassName="gap-6 p-4 pb-10">
+      <ScrollView ref={scrollViewRef} contentContainerClassName="gap-6 p-4 pb-10">
         <LinearGradient
           colors={[Colors.brandOrange, Colors.brandRed]}
           start={{ x: 0, y: 0 }}
@@ -61,6 +99,36 @@ export default function HomeScreen() {
         </LinearGradient>
 
         <IngredientPicker />
+
+        {categories.length > 0 && (
+          <View className="gap-4">
+            <CategoryNav categories={categories} onSelect={scrollToCategory} />
+
+            {sections.map((section) => (
+              <View
+                key={section.categoryName}
+                onLayout={(event) => {
+                  sectionOffsets.current[section.categoryName] = event.nativeEvent.layout.y;
+                }}
+                className="gap-3"
+              >
+                <Text className="text-lg font-semibold text-foreground">
+                  {getCategoryLabel(section.categoryName)}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 4 }}
+                  contentContainerClassName="gap-3"
+                >
+                  {section.meals.map((meal) => (
+                    <MealCard key={meal.id} meal={meal} />
+                  ))}
+                </ScrollView>
+              </View>
+            ))}
+          </View>
+        )}
 
       {recentHistory.length > 0 && (
         <View className="gap-2 rounded-2xl bg-surface-card p-5 shadow-sm">
