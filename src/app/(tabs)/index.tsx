@@ -35,17 +35,17 @@ export default function HomeScreen() {
           colors={[Colors.brandOrange, Colors.brandRed]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={{ borderRadius: 16 }}
-          className="gap-4 p-6"
+          style={{ borderRadius: 16, alignItems: "center", overflow: "hidden" }}
+          className="gap-4 px-6 pt-6 pb-10"
         >
           <Text className="text-3xl font-bold text-white">CookSnap</Text>
-          <Text className="text-base text-white/90">
+          <Text className="text-center text-base text-white/90">
             {name ? `Merhaba, ${name}!` : "Merhaba!"} Dolabındaki malzemelerin fotoğrafını çek, öğrenci/ev
             yemeği/aşçı modundan birini seç, AI saniyeler içinde tarifini çıkarsın.
           </Text>
           <Pressable
             onPress={() => router.push("/chat")}
-            className="flex-row items-center gap-2 self-start rounded-full bg-white px-5 py-3"
+            className="flex-row items-center gap-2 rounded-full bg-white px-5 py-3"
           >
             <MessageCircle size={18} color={Colors.brandRed} />
             <Text className="text-sm font-semibold text-brand-red">Sohbete Başla</Text>
