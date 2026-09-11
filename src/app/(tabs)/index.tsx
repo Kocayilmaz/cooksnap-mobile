@@ -1,9 +1,11 @@
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { Clock, MessageCircle, Star } from "lucide-react-native";
-import { Pressable } from "react-native";
 import { useAppSelector } from "@/lib/redux/hooks";
 import { EQUIPMENT_LABELS } from "@/lib/redux/equipmentSlice";
+import { Colors } from "@/constants/theme";
 
 const RECENT_PREVIEW_COUNT = 3;
 
@@ -27,21 +29,28 @@ export default function HomeScreen() {
     .slice(0, RECENT_PREVIEW_COUNT);
 
   return (
-    <ScrollView className="flex-1 bg-surface-warm" contentContainerClassName="gap-6 p-4 pb-10">
-      <View className="gap-4 rounded-2xl bg-brand-red p-6">
-        <Text className="text-3xl font-bold text-white">CookSnap</Text>
-        <Text className="text-base text-white/90">
-          {name ? `Merhaba, ${name}!` : "Merhaba!"} Dolabındaki malzemelerin fotoğrafını çek, öğrenci/ev
-          yemeği/aşçı modundan birini seç, AI saniyeler içinde tarifini çıkarsın.
-        </Text>
-        <Pressable
-          onPress={() => router.push("/chat")}
-          className="flex-row items-center gap-2 self-start rounded-full bg-white px-5 py-3"
+    <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
+      <ScrollView contentContainerClassName="gap-6 p-4 pb-10">
+        <LinearGradient
+          colors={[Colors.brandOrange, Colors.brandRed]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ borderRadius: 16 }}
+          className="gap-4 p-6"
         >
-          <MessageCircle size={18} color="#e8272b" />
-          <Text className="text-sm font-semibold text-brand-red">Sohbete Başla</Text>
-        </Pressable>
-      </View>
+          <Text className="text-3xl font-bold text-white">CookSnap</Text>
+          <Text className="text-base text-white/90">
+            {name ? `Merhaba, ${name}!` : "Merhaba!"} Dolabındaki malzemelerin fotoğrafını çek, öğrenci/ev
+            yemeği/aşçı modundan birini seç, AI saniyeler içinde tarifini çıkarsın.
+          </Text>
+          <Pressable
+            onPress={() => router.push("/chat")}
+            className="flex-row items-center gap-2 self-start rounded-full bg-white px-5 py-3"
+          >
+            <MessageCircle size={18} color={Colors.brandRed} />
+            <Text className="text-sm font-semibold text-brand-red">Sohbete Başla</Text>
+          </Pressable>
+        </LinearGradient>
 
       {recentHistory.length > 0 && (
         <View className="gap-2 rounded-2xl bg-surface-card p-5 shadow-sm">
@@ -80,6 +89,7 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
