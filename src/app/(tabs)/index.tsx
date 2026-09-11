@@ -35,8 +35,15 @@ export default function HomeScreen() {
           colors={[Colors.brandOrange, Colors.brandRed]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={{ borderRadius: 16, alignItems: "center", overflow: "hidden" }}
-          className="gap-4 px-6 pt-6 pb-10"
+          style={{
+            borderRadius: 16,
+            alignItems: "center",
+            overflow: "hidden",
+            gap: 24,
+            paddingHorizontal: 28,
+            paddingTop: 36,
+            paddingBottom: 56,
+          }}
         >
           <Text className="text-3xl font-bold text-white">CookSnap</Text>
           <Text className="text-center text-base text-white/90">
