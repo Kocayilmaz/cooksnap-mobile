@@ -1,5 +1,7 @@
-import { Alert, Dimensions, Pressable, ScrollView, Text, View } from "react-native";
-import { MessageCircle, Pin, PinOff, SquarePen, Star, Trash2, X } from "lucide-react-native";
+import { useState } from "react";
+import { Alert, Dimensions, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Image } from "expo-image";
+import { MessageCircle, Pin, PinOff, Search, SquarePen, Star, Trash2 } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import {
   deleteHistoryEntry,
@@ -68,22 +70,44 @@ function HistoryRow({
   );
 }
 
+function SectionLabel({ icon, children }: { icon: React.ReactNode; children: string }) {
+  return (
+    <View style={{ marginTop: 4 }} className="flex-row items-center gap-1.5">
+      {icon}
+      <Text style={{ textTransform: "uppercase" }} className="text-xs font-bold text-surface-text-muted">
+        {children}
+      </Text>
+    </View>
+  );
+}
+
 /** ne-pisirsem'deki ChatSidebar.tsx'in mobil karşılığı. Kendi başına açılıp
  * kapanmıyor/animasyon yapmıyor — Chat ekranı (bkz. app/(tabs)/chat.tsx) bu
  * paneli hep aynı yerde (solda, sabit genişlikte, DRAWER_WIDTH) tutuyor ve
  * ana içeriği ChatGPT'deki gibi Animated.View ile sağa "iterek" açığa
- * çıkarıyor — bu yüzden burada Modal/backdrop/kendi animasyonu yok. Yeniden
- * adlandırma (rename) da yok — pin/sil var. Arama kutusu da yok, geçmiş kısa
- * olduğu için şimdilik gerek görülmedi. */
+ * çıkarıyor. Üstte logo + arama, ortada kaydırılabilir favoriler/geçmiş
+ * listesi, en altta sabit (kaydırmayan) mutfak zamanlayıcısı — kapatma
+ * artık dışarı (ana ekrana) dokunarak yapılıyor, ayrı bir X butonu yok. */
 export default function ChatSidebarDrawer({ onClose, onNewChat, onSelectEntry, disabled }: ChatSidebarDrawerProps) {
   const dispatch = useAppDispatch();
   const history = useAppSelector((state) => state.history);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const favorites = history.filter((entry) => entry.isFavorite);
-  const others = history.filter((entry) => !entry.isFavorite);
+  const term = searchTerm.trim().toLowerCase();
+  const visible = term
+    ? history.filter(
+        (entry) =>
+          historyEntryTitle(entry).toLowerCase().includes(term) ||
+          summarizeHistoryEntry(entry).toLowerCase().includes(term),
+      )
+    : history;
+  const favorites = visible.filter((entry) => entry.isFavorite);
+  const others = visible.filter((entry) => !entry.isFavorite);
 
   function handleClearOthers() {
-    if (others.length === 0) return;
+    const allOthers = history.filter((entry) => !entry.isFavorite);
+    if (allOthers.length === 0) return;
     Alert.alert("Geçmişi temizle", "Sabitlenmeyen tüm sohbet geçmişini silmek istediğine emin misin?", [
       { text: "Vazgeç", style: "cancel" },
       {
@@ -96,12 +120,40 @@ export default function ChatSidebarDrawer({ onClose, onNewChat, onSelectEntry, d
 
   return (
     <View style={{ width: DRAWER_WIDTH }} className="h-full bg-surface-warm">
-      <ScrollView contentContainerClassName="gap-4 p-4" style={{ paddingTop: 48 }}>
+      <View style={{ paddingTop: 48 }} className="gap-4 px-4">
         <View className="flex-row items-center justify-between">
-          <Text className="text-base font-bold text-foreground">Sohbetler</Text>
-          <Pressable onPress={onClose} hitSlop={8} style={{ height: 32, width: 32 }} className="items-center justify-center">
-            <X size={18} color={Colors.surfaceTextMuted} />
-          </Pressable>
+          {searchOpen ? (
+            <View className="flex-1 flex-row items-center gap-1.5 rounded-full border border-surface-border bg-surface-card px-3 py-1.5">
+              <Search size={14} color={Colors.surfaceTextMuted} />
+              <TextInput
+                autoFocus
+                value={searchTerm}
+                onChangeText={setSearchTerm}
+                onBlur={() => {
+                  if (!searchTerm.trim()) setSearchOpen(false);
+                }}
+                placeholder="Sohbetlerde ara"
+                placeholderTextColor={Colors.surfaceTextMuted}
+                className="flex-1 text-xs text-foreground"
+              />
+            </View>
+          ) : (
+            <Image
+              source={require("../../assets/images/cooksnap-logo.png")}
+              style={{ width: 120, height: 36 }}
+              contentFit="contain"
+            />
+          )}
+          {!searchOpen && (
+            <Pressable
+              onPress={() => setSearchOpen(true)}
+              hitSlop={8}
+              style={{ height: 32, width: 32 }}
+              className="items-center justify-center"
+            >
+              <Search size={18} color={Colors.surfaceTextMuted} />
+            </Pressable>
+          )}
         </View>
 
         <Pressable
@@ -115,15 +167,12 @@ export default function ChatSidebarDrawer({ onClose, onNewChat, onSelectEntry, d
           <SquarePen size={16} color="#ffffff" />
           <Text className="text-sm font-semibold text-white">Yeni sohbet</Text>
         </Pressable>
+      </View>
 
+      <ScrollView className="flex-1" contentContainerClassName="gap-2 p-4" style={{ marginTop: 4 }}>
         {favorites.length > 0 && (
           <View className="gap-1.5">
-            <View className="flex-row items-center gap-1.5">
-              <Star size={12} color={Colors.surfaceTextMuted} />
-              <Text style={{ textTransform: "uppercase" }} className="text-xs font-bold text-surface-text-muted">
-                Sohbet Favorileri
-              </Text>
-            </View>
+            <SectionLabel icon={<Star size={12} color={Colors.surfaceTextMuted} />}>Sohbet Favorileri</SectionLabel>
             {favorites.map((entry) => (
               <HistoryRow
                 key={entry.id}
@@ -140,11 +189,11 @@ export default function ChatSidebarDrawer({ onClose, onNewChat, onSelectEntry, d
 
         {others.length > 0 && (
           <View className="gap-1.5">
-            <View className="flex-row items-center justify-between">
+            <View style={{ marginTop: 4 }} className="flex-row items-center justify-between">
               <View className="flex-row items-center gap-1.5">
                 <MessageCircle size={12} color={Colors.surfaceTextMuted} />
                 <Text style={{ textTransform: "uppercase" }} className="text-xs font-bold text-surface-text-muted">
-                  Sohbetler
+                  Son Sohbetler
                 </Text>
               </View>
               <Pressable onPress={handleClearOthers}>
@@ -166,11 +215,18 @@ export default function ChatSidebarDrawer({ onClose, onNewChat, onSelectEntry, d
         )}
 
         {favorites.length === 0 && others.length === 0 && (
-          <Text className="text-xs text-surface-text-muted">Henüz bir sohbet geçmişin yok.</Text>
+          <Text className="text-xs text-surface-text-muted">
+            {term ? "Eşleşen bir sohbet bulunamadı." : "Henüz bir sohbet geçmişin yok."}
+          </Text>
         )}
-
-        <SidebarCookingTimer />
       </ScrollView>
+
+      <View
+        style={{ borderTopWidth: 1, borderTopColor: Colors.surfaceBorder, paddingTop: 12, paddingBottom: 16 }}
+        className="px-4"
+      >
+        <SidebarCookingTimer />
+      </View>
     </View>
   );
 }
