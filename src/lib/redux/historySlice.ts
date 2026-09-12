@@ -157,11 +157,15 @@ const historySlice = createSlice({
   reducers: {
     addHistoryEntry(
       state,
-      action: PayloadAction<Omit<HistoryEntry, "id" | "createdAt" | "isFavorite">>,
+      // `id` opsiyonel olarak dışarıdan verilebilir — mobil Chat ekranı
+      // (bkz. app/(tabs)/chat.tsx) yeni oluşan sohbeti aynı oturumda hemen
+      // sabitleyebilmek (Pin) için kaydın id'sini önceden kendisi üretip
+      // yerel state'inde de tutuyor.
+      action: PayloadAction<Omit<HistoryEntry, "id" | "createdAt" | "isFavorite"> & { id?: string }>,
     ) {
       const entry: HistoryEntry = {
         ...action.payload,
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: action.payload.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         createdAt: Date.now(),
         isFavorite: false,
       };
