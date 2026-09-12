@@ -98,6 +98,26 @@ export default function HomeScreen() {
           </Pressable>
         </LinearGradient>
 
+      {recentHistory.length > 0 && (
+        <View className="gap-2 rounded-2xl bg-surface-card p-5 shadow-sm">
+          <View className="flex-row items-center gap-1.5">
+            <Clock size={16} color="#171717" />
+            <Text className="text-sm font-medium text-foreground">Son aramaların</Text>
+          </View>
+          <View className="gap-2">
+            {recentHistory.map((entry) => (
+              <View key={entry.id} className="rounded-lg border border-surface-border px-3 py-2">
+                <Text className="text-xs text-foreground">
+                  {entry.recipeTitles.length > 0
+                    ? entry.recipeTitles.join(", ")
+                    : `${entry.equipment.map((key) => EQUIPMENT_LABELS[key]).join(", ")} · ${entry.personCount} kişilik`}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
         <IngredientPicker />
 
         {categories.length > 0 && (
@@ -129,26 +149,6 @@ export default function HomeScreen() {
             ))}
           </View>
         )}
-
-      {recentHistory.length > 0 && (
-        <View className="gap-2 rounded-2xl bg-surface-card p-5 shadow-sm">
-          <View className="flex-row items-center gap-1.5">
-            <Clock size={16} color="#171717" />
-            <Text className="text-sm font-medium text-foreground">Son aramaların</Text>
-          </View>
-          <View className="gap-2">
-            {recentHistory.map((entry) => (
-              <View key={entry.id} className="rounded-lg border border-surface-border px-3 py-2">
-                <Text className="text-xs text-foreground">
-                  {entry.recipeTitles.length > 0
-                    ? entry.recipeTitles.join(", ")
-                    : `${entry.equipment.map((key) => EQUIPMENT_LABELS[key]).join(", ")} · ${entry.personCount} kişilik`}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
 
       {recentFavorites.length > 0 && (
         <View className="gap-2 rounded-2xl bg-surface-card p-5 shadow-sm">
