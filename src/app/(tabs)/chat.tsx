@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   Text,
   TextInput,
   View,
@@ -14,10 +16,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import { Camera, Menu, Send, X } from "lucide-react-native";
+import { Camera, Menu, Mic, MoreVertical, Plus, Search, Send, SquarePen, X } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { EQUIPMENT_KEYS, EQUIPMENT_LABELS, setEquipment, type Equipment } from "@/lib/redux/equipmentSlice";
-import { addHistoryEntry, type HistoryEntry } from "@/lib/redux/historySlice";
+import { addHistoryEntry, deleteHistoryEntry, toggleHistoryFavorite, type HistoryEntry } from "@/lib/redux/historySlice";
 import { setPersonCount } from "@/lib/redux/personCountSlice";
 import { setRecipeMode } from "@/lib/redux/recipeModeSlice";
 import { FREE_USAGE_LIMIT, incrementUsage } from "@/lib/redux/usageCounterSlice";
@@ -27,6 +29,9 @@ import PersonCountSelector from "@/components/PersonCountSelector";
 import RecipeModeSelector from "@/components/RecipeModeSelector";
 import RecipeMessageCard from "@/components/RecipeMessageCard";
 import ChatSidebarDrawer, { DRAWER_WIDTH } from "@/components/ChatSidebarDrawer";
+import BlurIconButton from "@/components/BlurIconButton";
+import ChatOptionsMenu from "@/components/ChatOptionsMenu";
+import AttachMenu from "@/components/AttachMenu";
 import { Colors } from "@/constants/theme";
 import type { ChatMessage } from "@/lib/types/chat";
 
@@ -40,19 +45,37 @@ function makeMessageId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function ChatHeader({ title, onMenuPress }: { title?: string; onMenuPress: () => void }) {
+/** Hamburger her zaman sol üstte — devam eden bir sohbette sağda ayrıca
+ * "yeni sohbet" (ikon) ve "..." (seçenekler) butonları var, yeni sohbet
+ * formunda yalnızca hamburger gösteriliyor. ChatGPT'deki gibi ayrı bir
+ * başlık çubuğu (arka plan/kenarlık) yok — butonlar içeriğin üzerinde
+ * yüzüyor, buzlu cam görünümü BlurIconButton'dan geliyor. */
+function ChatFloatingHeader({
+  onMenuPress,
+  hasStartedChat,
+  onNewChat,
+  onOptionsPress,
+}: {
+  onMenuPress: () => void;
+  hasStartedChat: boolean;
+  onNewChat: () => void;
+  onOptionsPress: () => void;
+}) {
   return (
-    <View
-      style={{ borderBottomWidth: 1, borderBottomColor: Colors.surfaceBorder }}
-      className="flex-row items-center bg-surface-card px-3 py-2"
-    >
-      <Pressable onPress={onMenuPress} hitSlop={8} style={{ height: 36, width: 36 }} className="items-center justify-center">
+    <View style={{ position: "absolute", top: 8, left: 12, right: 12, zIndex: 10 }} className="flex-row items-center justify-between">
+      <BlurIconButton onPress={onMenuPress}>
         <Menu size={20} color={Colors.foreground} />
-      </Pressable>
-      {title && (
-        <Text style={{ marginLeft: 8 }} className="text-sm font-semibold text-foreground">
-          {title}
-        </Text>
+      </BlurIconButton>
+
+      {hasStartedChat && (
+        <View className="flex-row gap-2">
+          <BlurIconButton onPress={onNewChat}>
+            <SquarePen size={18} color={Colors.foreground} />
+          </BlurIconButton>
+          <BlurIconButton onPress={onOptionsPress}>
+            <MoreVertical size={18} color={Colors.foreground} />
+          </BlurIconButton>
+        </View>
       )}
     </View>
   );
@@ -61,10 +84,10 @@ function ChatHeader({ title, onMenuPress }: { title?: string; onMenuPress: () =>
 /**
  * ne-pisirsem'deki app/chat/page.tsx'in mobil karşılığı. Sohbet geçmişi
  * çekmecesi (bkz. ChatSidebarDrawer) ChatGPT'deki gibi ana içeriği sağa
- * "itiyor" — üstüne bindirilen bir Modal değil, çekmece hep aynı yerde
- * durur, ana içerik onun genişliği kadar (Animated translateX) kayar.
- * Premium API anahtarı girme ekranı (Profil) henüz yok, o yüzden şu an
- * her zaman ücretsiz mod.
+ * "itiyor". Başlık ve alt yazma barı da ChatGPT'ninkine benzetildi: ayrı bir
+ * çubuk/kenarlık yok, sadece yüzen ikon butonları ve tek bir yuvarlak
+ * yazma kutusu + gönder butonu. Premium API anahtarı girme ekranı (Profil)
+ * henüz yok, o yüzden şu an her zaman ücretsiz mod.
  */
 export default function ChatScreen() {
   // Anasayfadaki IngredientPicker /chat'e { ingredients } param'ıyla
@@ -77,6 +100,7 @@ export default function ChatScreen() {
   const recipeMode = useAppSelector((state) => state.recipeMode.value);
   const userProfile = useAppSelector((state) => state.userProfile);
   const usageCount = useAppSelector((state) => state.usageCounter.count);
+  const history = useAppSelector((state) => state.history);
   const isFreeMode = true;
   const limitReached = isFreeMode && usageCount >= FREE_USAGE_LIMIT;
 
@@ -86,9 +110,20 @@ export default function ChatScreen() {
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [followUpText, setFollowUpText] = useState("");
+  const [followUpPhoto, setFollowUpPhoto] = useState<string | null>(null);
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const [isAttachOpen, setIsAttachOpen] = useState(false);
+  const [isFindOpen, setIsFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  // Şu an ekranda görünen sohbetin historySlice'taki kaydı — yeni bir tarif
+  // üretildiğinde (handleSubmit) ya da çekmeceden bir kayıt seçildiğinde
+  // (handleSelectEntry) buraya yazılır; "..." menüsündeki Pinle/Sil bu id'yi
+  // kullanır. Henüz kaydedilmemiş (ör. hâlâ ilk istek gönderiliyor) bir
+  // sohbette null'dur.
+  const [currentEntryId, setCurrentEntryId] = useState<string | null>(null);
 
   const pushX = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -102,22 +137,25 @@ export default function ChatScreen() {
   const hasIngredientsText = ingredientsText.trim().length > 0;
   const hasStartedChat = messages.length > 0;
   const canSubmit = Boolean(photo) || hasIngredientsText;
+  const currentEntry = currentEntryId ? history.find((entry) => entry.id === currentEntryId) : undefined;
 
-  async function pickPhoto() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  async function pickPhotoFrom(source: "camera" | "library", target: "new" | "followUp") {
+    const permission =
+      source === "camera"
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) return;
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      base64: true,
-      quality: 0.7,
-    });
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"], base64: true, quality: 0.7 };
+    const result =
+      source === "camera" ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
     if (result.canceled) return;
 
     const asset = result.assets[0];
-    if (asset.base64) {
-      setPhoto(`data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}`);
-    }
+    if (!asset.base64) return;
+    const dataUrl = `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}`;
+    if (target === "new") setPhoto(dataUrl);
+    else setFollowUpPhoto(dataUrl);
   }
 
   async function callApi(ingredientsDescription: string, photoDataUrl?: string) {
@@ -158,8 +196,11 @@ export default function ChatScreen() {
       ]);
       setStatus("idle");
 
+      const newEntryId = makeMessageId();
+      setCurrentEntryId(newEntryId);
       dispatch(
         addHistoryEntry({
+          id: newEntryId,
           ingredientsText: hasIngredientsText ? ingredientsText.trim() : undefined,
           hadPhoto: Boolean(photo),
           personCount,
@@ -176,19 +217,25 @@ export default function ChatScreen() {
 
   async function handleFollowUpSend() {
     const trimmed = followUpText.trim();
-    if (!trimmed || isSendingFollowUp || limitReached) return;
+    if ((!trimmed && !followUpPhoto) || isSendingFollowUp || limitReached) return;
 
     const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant");
     const previousTitles = lastAssistantMessage?.recipes?.map((r) => r.title).join(", ");
-    const combinedText = previousTitles ? `Önceki tarif(ler): ${previousTitles}. Ek istek: ${trimmed}` : trimmed;
+    const combinedText = previousTitles
+      ? `Önceki tarif(ler): ${previousTitles}. Ek istek: ${trimmed || "(fotoğrafa bak)"}`
+      : trimmed;
 
     setIsSendingFollowUp(true);
     setFollowUpError(null);
-    setMessages((prev) => [...prev, { id: makeMessageId(), role: "user", text: trimmed, createdAt: Date.now() }]);
+    setMessages((prev) => [
+      ...prev,
+      { id: makeMessageId(), role: "user", text: trimmed || "Fotoğrafımdaki malzemelerle ne yapabilirim?", createdAt: Date.now() },
+    ]);
     setFollowUpText("");
+    setFollowUpPhoto(null);
 
     try {
-      const recipes = await callApi(combinedText);
+      const recipes = await callApi(combinedText, followUpPhoto ?? undefined);
       setMessages((prev) => [...prev, { id: makeMessageId(), role: "assistant", recipes, createdAt: Date.now() }]);
     } catch (err) {
       setFollowUpError(err instanceof ApiRequestError || err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu.");
@@ -204,7 +251,11 @@ export default function ChatScreen() {
     setError(null);
     setMessages([]);
     setFollowUpText("");
+    setFollowUpPhoto(null);
     setFollowUpError(null);
+    setCurrentEntryId(null);
+    setIsFindOpen(false);
+    setFindQuery("");
   }
 
   // ne-pisirsem'deki app/chat/page.tsx handleSelectEntry ile aynı mantık —
@@ -214,6 +265,7 @@ export default function ChatScreen() {
     dispatch(setPersonCount(entry.personCount));
     dispatch(setEquipment(buildEquipmentState(entry.equipment)));
     dispatch(setRecipeMode(entry.mode));
+    setCurrentEntryId(entry.id);
 
     if (entry.messages && entry.messages.length > 0) {
       setMessages(entry.messages);
@@ -244,126 +296,247 @@ export default function ChatScreen() {
     setFollowUpError(null);
   }
 
+  function handleTogglePin() {
+    if (!currentEntryId) {
+      Alert.alert("Henüz kaydedilmedi", "Bu sohbet daha kaydedilmediği için sabitlenemiyor.");
+      return;
+    }
+    dispatch(toggleHistoryFavorite(currentEntryId));
+  }
+
+  async function handleShare() {
+    const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant");
+    const titles = lastAssistantMessage?.recipes?.map((r) => r.title).join(", ");
+    try {
+      await Share.share({ message: titles ? `CookSnap'te bulduğum tarif: ${titles}` : "CookSnap'ten bir sohbet paylaşıyorum." });
+    } catch {
+      // kullanıcı paylaşım sayfasını kapattıysa best-effort, hata göstermeye gerek yok.
+    }
+  }
+
+  function handleDeleteCurrentChat() {
+    Alert.alert("Sohbeti sil", "Bu sohbeti silmek istediğine emin misin?", [
+      { text: "Vazgeç", style: "cancel" },
+      {
+        text: "Sil",
+        style: "destructive",
+        onPress: () => {
+          if (currentEntryId) dispatch(deleteHistoryEntry(currentEntryId));
+          handleNewChat();
+        },
+      },
+    ]);
+  }
+
+  const visibleMessages =
+    isFindOpen && findQuery.trim()
+      ? messages.filter((message) => {
+          const term = findQuery.trim().toLowerCase();
+          return (
+            message.text?.toLowerCase().includes(term) ||
+            message.recipes?.some((recipe) => recipe.title.toLowerCase().includes(term))
+          );
+        })
+      : messages;
+
   const screenContent = hasStartedChat ? (
     <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ChatHeader title="CookSnap" onMenuPress={() => setIsSidebarOpen(true)} />
+        <View style={{ flex: 1 }}>
+          <ChatFloatingHeader
+            onMenuPress={() => setIsSidebarOpen(true)}
+            hasStartedChat
+            onNewChat={handleNewChat}
+            onOptionsPress={() => setIsOptionsOpen(true)}
+          />
 
-        <ScrollView className="flex-1" contentContainerClassName="gap-3 p-4">
-          {messages.map((message) =>
-            message.role === "user" ? (
-              <View key={message.id} className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-orange px-4 py-2.5">
-                <Text className="text-sm text-white">{message.text}</Text>
-              </View>
-            ) : (
-              <View key={message.id} className="gap-3">
-                {message.text && (
-                  <View className="max-w-[85%] self-start rounded-2xl rounded-bl-md border border-surface-border bg-surface-card px-4 py-2.5">
-                    <Text className="text-sm text-foreground">{message.text}</Text>
-                  </View>
-                )}
-                {message.recipes?.map((recipe, index) => <RecipeMessageCard key={index} recipe={recipe} />)}
-              </View>
-            ),
-          )}
-          {isSendingFollowUp && (
-            <View className="max-w-[85%] self-start rounded-2xl rounded-bl-md border border-surface-border bg-surface-card px-4 py-2.5">
-              <Text className="text-sm text-surface-text-muted">Tarif hazırlanıyor…</Text>
+          {isFindOpen && (
+            <View
+              style={{ position: "absolute", top: 56, left: 12, right: 12, zIndex: 9 }}
+              className="flex-row items-center gap-2 rounded-full border border-surface-border bg-surface-card px-4 py-2"
+            >
+              <Search size={14} color={Colors.surfaceTextMuted} />
+              <TextInput
+                autoFocus
+                value={findQuery}
+                onChangeText={setFindQuery}
+                placeholder="Bu sohbette ara"
+                placeholderTextColor={Colors.surfaceTextMuted}
+                className="flex-1 text-sm text-foreground"
+              />
+              <Pressable
+                onPress={() => {
+                  setIsFindOpen(false);
+                  setFindQuery("");
+                }}
+                hitSlop={8}
+              >
+                <X size={16} color={Colors.surfaceTextMuted} />
+              </Pressable>
             </View>
           )}
-          {followUpError && <Text className="text-center text-sm text-state-error">{followUpError}</Text>}
-        </ScrollView>
 
-        <View className="flex-row items-center gap-2 border-t border-surface-border bg-surface-card p-3">
-          <Pressable onPress={handleNewChat} className="rounded-full border border-surface-border px-3 py-2">
-            <Text className="text-xs font-semibold text-surface-text-muted">Yeni sohbet</Text>
-          </Pressable>
-          <TextInput
-            value={followUpText}
-            onChangeText={setFollowUpText}
-            placeholder="Ek bir şey sor ya da malzeme ekle…"
-            className="flex-1 rounded-full border border-surface-border px-4 py-2.5 text-foreground"
-            placeholderTextColor={Colors.surfaceTextMuted}
-            editable={!isSendingFollowUp && !limitReached}
-          />
-          <Pressable
-            onPress={handleFollowUpSend}
-            disabled={isSendingFollowUp || limitReached || !followUpText.trim()}
-            className="h-10 w-10 items-center justify-center rounded-full bg-brand-orange disabled:opacity-50"
-          >
-            <Send size={16} color="#ffffff" />
-          </Pressable>
+          <ScrollView className="flex-1" contentContainerClassName="gap-3 p-4" style={{ paddingTop: 64 }}>
+            {visibleMessages.map((message) =>
+              message.role === "user" ? (
+                <View key={message.id} className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-orange px-4 py-2.5">
+                  <Text className="text-sm text-white">{message.text}</Text>
+                </View>
+              ) : (
+                <View key={message.id} className="gap-3">
+                  {message.text && (
+                    <View className="max-w-[85%] self-start rounded-2xl rounded-bl-md border border-surface-border bg-surface-card px-4 py-2.5">
+                      <Text className="text-sm text-foreground">{message.text}</Text>
+                    </View>
+                  )}
+                  {message.recipes?.map((recipe, index) => <RecipeMessageCard key={index} recipe={recipe} />)}
+                </View>
+              ),
+            )}
+            {isSendingFollowUp && (
+              <View className="max-w-[85%] self-start rounded-2xl rounded-bl-md border border-surface-border bg-surface-card px-4 py-2.5">
+                <Text className="text-sm text-surface-text-muted">Tarif hazırlanıyor…</Text>
+              </View>
+            )}
+            {followUpError && <Text className="text-center text-sm text-state-error">{followUpError}</Text>}
+          </ScrollView>
+        </View>
+
+        <View className="gap-2 p-3">
+          {followUpPhoto && (
+            <View className="flex-row items-center gap-2 self-start rounded-xl border border-surface-border bg-surface-card p-2">
+              <Image source={{ uri: followUpPhoto }} className="h-10 w-10 rounded-lg" />
+              <Pressable onPress={() => setFollowUpPhoto(null)} hitSlop={8}>
+                <X size={16} color={Colors.stateError} />
+              </Pressable>
+            </View>
+          )}
+          <View style={{ alignItems: "flex-end" }} className="flex-row gap-2">
+            <Pressable
+              onPress={() => setIsAttachOpen(true)}
+              style={{ height: 40, width: 40 }}
+              className="items-center justify-center rounded-full border border-surface-border bg-surface-card"
+            >
+              <Plus size={18} color={Colors.foreground} />
+            </Pressable>
+            <TextInput
+              value={followUpText}
+              onChangeText={setFollowUpText}
+              placeholder="Ek bir şey sor ya da malzeme ekle…"
+              className="flex-1 rounded-full border border-surface-border bg-surface-card px-4 py-2.5 text-foreground"
+              placeholderTextColor={Colors.surfaceTextMuted}
+              editable={!isSendingFollowUp && !limitReached}
+            />
+            <Pressable
+              onPress={() => Alert.alert("Sesli yazma", "Bu özellik yakında geliyor.")}
+              style={{ height: 40, width: 40 }}
+              className="items-center justify-center rounded-full border border-surface-border bg-surface-card"
+            >
+              <Mic size={18} color={Colors.foreground} />
+            </Pressable>
+            <Pressable
+              onPress={handleFollowUpSend}
+              disabled={isSendingFollowUp || limitReached || (!followUpText.trim() && !followUpPhoto)}
+              className="h-10 w-10 items-center justify-center rounded-full bg-brand-orange disabled:opacity-50"
+            >
+              <Send size={16} color="#ffffff" />
+            </Pressable>
+          </View>
         </View>
       </KeyboardAvoidingView>
+
+      <ChatOptionsMenu
+        visible={isOptionsOpen}
+        onClose={() => setIsOptionsOpen(false)}
+        isPinned={Boolean(currentEntry?.isFavorite)}
+        onTogglePin={handleTogglePin}
+        onFindInChat={() => setIsFindOpen(true)}
+        onShare={handleShare}
+        onUploadPhoto={() => pickPhotoFrom("library", "followUp")}
+        onDelete={handleDeleteCurrentChat}
+      />
+      <AttachMenu
+        visible={isAttachOpen}
+        onClose={() => setIsAttachOpen(false)}
+        onPickCamera={() => pickPhotoFrom("camera", "followUp")}
+        onPickLibrary={() => pickPhotoFrom("library", "followUp")}
+      />
     </SafeAreaView>
   ) : (
     <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ChatHeader onMenuPress={() => setIsSidebarOpen(true)} />
-
-        <ScrollView contentContainerClassName="gap-6 p-4 pb-10">
-          <View className="gap-1">
-            <Text className="text-center text-2xl font-semibold text-brand-red">CookSnap</Text>
-            <Text className="text-center text-sm text-surface-text-muted">
-              Fotoğraf çek ya da malzemeleri yaz, elindekilere göre tarifini al.
-            </Text>
-          </View>
-
-          {photo ? (
-            <View className="items-center gap-2">
-              <Image source={{ uri: photo }} className="h-48 w-48 rounded-2xl" />
-              <Pressable onPress={() => setPhoto(null)} className="flex-row items-center gap-1">
-                <X size={14} color={Colors.stateError} />
-                <Text className="text-xs font-medium text-state-error">Fotoğrafı kaldır</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <Pressable
-              onPress={pickPhoto}
-              className="flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-surface-border py-6"
-            >
-              <Camera size={20} color={Colors.surfaceTextMuted} />
-              <Text className="text-sm font-medium text-surface-text-muted">Fotoğraf seç</Text>
-            </Pressable>
-          )}
-
-          <TextInput
-            value={ingredientsText}
-            onChangeText={setIngredientsText}
-            placeholder="Elindeki malzemeleri yaz (örn. 2 yumurta, biraz peynir)"
-            multiline
-            className="min-h-20 rounded-xl border border-surface-border p-3 text-foreground"
-            placeholderTextColor={Colors.surfaceTextMuted}
+        <View style={{ flex: 1 }}>
+          <ChatFloatingHeader
+            onMenuPress={() => setIsSidebarOpen(true)}
+            hasStartedChat={false}
+            onNewChat={handleNewChat}
+            onOptionsPress={() => setIsOptionsOpen(true)}
           />
 
-          <PersonCountSelector />
-          <EquipmentSelector />
-          <RecipeModeSelector />
+          <ScrollView contentContainerClassName="gap-6 p-4 pb-10" style={{ paddingTop: 56 }}>
+            <View className="gap-1">
+              <Text className="text-center text-2xl font-semibold text-brand-red">CookSnap</Text>
+              <Text className="text-center text-sm text-surface-text-muted">
+                Fotoğraf çek ya da malzemeleri yaz, elindekilere göre tarifini al.
+              </Text>
+            </View>
 
-          <Pressable
-            onPress={handleSubmit}
-            disabled={!canSubmit || status === "loading" || limitReached}
-            className="flex-row items-center justify-center gap-2 rounded-full bg-brand-orange py-3 disabled:opacity-50"
-          >
-            {status === "loading" ? (
-              <ActivityIndicator color="#ffffff" />
+            {photo ? (
+              <View className="items-center gap-2">
+                <Image source={{ uri: photo }} className="h-48 w-48 rounded-2xl" />
+                <Pressable onPress={() => setPhoto(null)} className="flex-row items-center gap-1">
+                  <X size={14} color={Colors.stateError} />
+                  <Text className="text-xs font-medium text-state-error">Fotoğrafı kaldır</Text>
+                </Pressable>
+              </View>
             ) : (
-              <Text className="text-sm font-semibold text-white">Tarifi getir</Text>
+              <Pressable
+                onPress={() => pickPhotoFrom("library", "new")}
+                className="flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-surface-border py-6"
+              >
+                <Camera size={20} color={Colors.surfaceTextMuted} />
+                <Text className="text-sm font-medium text-surface-text-muted">Fotoğraf seç</Text>
+              </Pressable>
             )}
-          </Pressable>
 
-          {limitReached ? (
-            <Text className="text-center text-xs text-state-error">
-              Ücretsiz mod limitine ulaştın ({usageCount}/{FREE_USAGE_LIMIT}).
-            </Text>
-          ) : (
-            <Text className="text-center text-xs text-surface-text-muted">
-              Ücretsiz modda kullanılan istek: {usageCount}/{FREE_USAGE_LIMIT}
-            </Text>
-          )}
+            <TextInput
+              value={ingredientsText}
+              onChangeText={setIngredientsText}
+              placeholder="Elindeki malzemeleri yaz (örn. 2 yumurta, biraz peynir)"
+              multiline
+              className="min-h-20 rounded-xl border border-surface-border p-3 text-foreground"
+              placeholderTextColor={Colors.surfaceTextMuted}
+            />
 
-          {error && <Text className="text-center text-sm text-state-error">{error}</Text>}
-        </ScrollView>
+            <PersonCountSelector />
+            <EquipmentSelector />
+            <RecipeModeSelector />
+
+            <Pressable
+              onPress={handleSubmit}
+              disabled={!canSubmit || status === "loading" || limitReached}
+              className="flex-row items-center justify-center gap-2 rounded-full bg-brand-orange py-3 disabled:opacity-50"
+            >
+              {status === "loading" ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text className="text-sm font-semibold text-white">Tarifi getir</Text>
+              )}
+            </Pressable>
+
+            {limitReached ? (
+              <Text className="text-center text-xs text-state-error">
+                Ücretsiz mod limitine ulaştın ({usageCount}/{FREE_USAGE_LIMIT}).
+              </Text>
+            ) : (
+              <Text className="text-center text-xs text-surface-text-muted">
+                Ücretsiz modda kullanılan istek: {usageCount}/{FREE_USAGE_LIMIT}
+              </Text>
+            )}
+
+            {error && <Text className="text-center text-sm text-state-error">{error}</Text>}
+          </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
