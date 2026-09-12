@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -25,7 +26,7 @@ import EquipmentSelector from "@/components/EquipmentSelector";
 import PersonCountSelector from "@/components/PersonCountSelector";
 import RecipeModeSelector from "@/components/RecipeModeSelector";
 import RecipeMessageCard from "@/components/RecipeMessageCard";
-import ChatSidebarDrawer from "@/components/ChatSidebarDrawer";
+import ChatSidebarDrawer, { DRAWER_WIDTH } from "@/components/ChatSidebarDrawer";
 import { Colors } from "@/constants/theme";
 import type { ChatMessage } from "@/lib/types/chat";
 
@@ -39,11 +40,31 @@ function makeMessageId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function ChatHeader({ title, onMenuPress }: { title?: string; onMenuPress: () => void }) {
+  return (
+    <View
+      style={{ borderBottomWidth: 1, borderBottomColor: Colors.surfaceBorder }}
+      className="flex-row items-center bg-surface-card px-3 py-2"
+    >
+      <Pressable onPress={onMenuPress} hitSlop={8} style={{ height: 36, width: 36 }} className="items-center justify-center">
+        <Menu size={20} color={Colors.foreground} />
+      </Pressable>
+      {title && (
+        <Text style={{ marginLeft: 8 }} className="text-sm font-semibold text-foreground">
+          {title}
+        </Text>
+      )}
+    </View>
+  );
+}
+
 /**
- * ne-pisirsem'deki app/chat/page.tsx'in mobil karşılığı — sohbet geçmişi
- * sidecar'ı (ChatSidebar, "Sohbet Favorileri" dahil) burada henüz yok,
- * her açılışta yeni bir sohbetle başlanıyor; premium API anahtarı girme
- * ekranı (Profil) da henüz yok, o yüzden şu an her zaman ücretsiz mod.
+ * ne-pisirsem'deki app/chat/page.tsx'in mobil karşılığı. Sohbet geçmişi
+ * çekmecesi (bkz. ChatSidebarDrawer) ChatGPT'deki gibi ana içeriği sağa
+ * "itiyor" — üstüne bindirilen bir Modal değil, çekmece hep aynı yerde
+ * durur, ana içerik onun genişliği kadar (Animated translateX) kayar.
+ * Premium API anahtarı girme ekranı (Profil) henüz yok, o yüzden şu an
+ * her zaman ücretsiz mod.
  */
 export default function ChatScreen() {
   // Anasayfadaki IngredientPicker /chat'e { ingredients } param'ıyla
@@ -68,6 +89,15 @@ export default function ChatScreen() {
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const pushX = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(pushX, {
+      toValue: isSidebarOpen ? DRAWER_WIDTH : 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [isSidebarOpen, pushX]);
 
   const hasIngredientsText = ingredientsText.trim().length > 0;
   const hasStartedChat = messages.length > 0;
@@ -214,34 +244,10 @@ export default function ChatScreen() {
     setFollowUpError(null);
   }
 
-  if (hasStartedChat) {
-    return (
-      <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
-    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View
-          style={{ borderBottomWidth: 1, borderBottomColor: Colors.surfaceBorder }}
-          className="flex-row items-center bg-surface-card px-3 py-2"
-        >
-          <Pressable
-            onPress={() => setIsSidebarOpen(true)}
-            hitSlop={8}
-            style={{ height: 36, width: 36 }}
-            className="items-center justify-center"
-          >
-            <Menu size={20} color={Colors.foreground} />
-          </Pressable>
-          <Text style={{ marginLeft: 8 }} className="text-sm font-semibold text-foreground">
-            CookSnap
-          </Text>
-        </View>
-
-        <ChatSidebarDrawer
-          visible={isSidebarOpen}
-          onClose={() => setIsSidebarOpen(false)}
-          onNewChat={handleNewChat}
-          onSelectEntry={handleSelectEntry}
-          disabled={isSendingFollowUp}
-        />
+  const screenContent = hasStartedChat ? (
+    <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ChatHeader title="CookSnap" onMenuPress={() => setIsSidebarOpen(true)} />
 
         <ScrollView className="flex-1" contentContainerClassName="gap-3 p-4">
           {messages.map((message) =>
@@ -289,99 +295,99 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
-      </SafeAreaView>
-    );
-  }
+    </SafeAreaView>
+  ) : (
+    <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ChatHeader onMenuPress={() => setIsSidebarOpen(true)} />
+
+        <ScrollView contentContainerClassName="gap-6 p-4 pb-10">
+          <View className="gap-1">
+            <Text className="text-center text-2xl font-semibold text-brand-red">CookSnap</Text>
+            <Text className="text-center text-sm text-surface-text-muted">
+              Fotoğraf çek ya da malzemeleri yaz, elindekilere göre tarifini al.
+            </Text>
+          </View>
+
+          {photo ? (
+            <View className="items-center gap-2">
+              <Image source={{ uri: photo }} className="h-48 w-48 rounded-2xl" />
+              <Pressable onPress={() => setPhoto(null)} className="flex-row items-center gap-1">
+                <X size={14} color={Colors.stateError} />
+                <Text className="text-xs font-medium text-state-error">Fotoğrafı kaldır</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              onPress={pickPhoto}
+              className="flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-surface-border py-6"
+            >
+              <Camera size={20} color={Colors.surfaceTextMuted} />
+              <Text className="text-sm font-medium text-surface-text-muted">Fotoğraf seç</Text>
+            </Pressable>
+          )}
+
+          <TextInput
+            value={ingredientsText}
+            onChangeText={setIngredientsText}
+            placeholder="Elindeki malzemeleri yaz (örn. 2 yumurta, biraz peynir)"
+            multiline
+            className="min-h-20 rounded-xl border border-surface-border p-3 text-foreground"
+            placeholderTextColor={Colors.surfaceTextMuted}
+          />
+
+          <PersonCountSelector />
+          <EquipmentSelector />
+          <RecipeModeSelector />
+
+          <Pressable
+            onPress={handleSubmit}
+            disabled={!canSubmit || status === "loading" || limitReached}
+            className="flex-row items-center justify-center gap-2 rounded-full bg-brand-orange py-3 disabled:opacity-50"
+          >
+            {status === "loading" ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text className="text-sm font-semibold text-white">Tarifi getir</Text>
+            )}
+          </Pressable>
+
+          {limitReached ? (
+            <Text className="text-center text-xs text-state-error">
+              Ücretsiz mod limitine ulaştın ({usageCount}/{FREE_USAGE_LIMIT}).
+            </Text>
+          ) : (
+            <Text className="text-center text-xs text-surface-text-muted">
+              Ücretsiz modda kullanılan istek: {usageCount}/{FREE_USAGE_LIMIT}
+            </Text>
+          )}
+
+          {error && <Text className="text-center text-sm text-state-error">{error}</Text>}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 
   return (
-    <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
-    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View
-          style={{ borderBottomWidth: 1, borderBottomColor: Colors.surfaceBorder }}
-          className="flex-row items-center bg-surface-card px-3 py-2"
-        >
-          <Pressable
-            onPress={() => setIsSidebarOpen(true)}
-            hitSlop={8}
-            style={{ height: 36, width: 36 }}
-            className="items-center justify-center"
-          >
-            <Menu size={20} color={Colors.foreground} />
-          </Pressable>
-        </View>
-
+    <View style={{ flex: 1, backgroundColor: Colors.surfaceWarm }}>
+      <View style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: DRAWER_WIDTH }}>
         <ChatSidebarDrawer
-          visible={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           onNewChat={handleNewChat}
           onSelectEntry={handleSelectEntry}
           disabled={isSendingFollowUp}
         />
+      </View>
 
-      <ScrollView contentContainerClassName="gap-6 p-4 pb-10">
-        <View className="gap-1">
-          <Text className="text-center text-2xl font-semibold text-brand-red">CookSnap</Text>
-          <Text className="text-center text-sm text-surface-text-muted">
-            Fotoğraf çek ya da malzemeleri yaz, elindekilere göre tarifini al.
-          </Text>
-        </View>
-
-        {photo ? (
-          <View className="items-center gap-2">
-            <Image source={{ uri: photo }} className="h-48 w-48 rounded-2xl" />
-            <Pressable onPress={() => setPhoto(null)} className="flex-row items-center gap-1">
-              <X size={14} color={Colors.stateError} />
-              <Text className="text-xs font-medium text-state-error">Fotoğrafı kaldır</Text>
-            </Pressable>
-          </View>
-        ) : (
+      <Animated.View style={{ flex: 1, transform: [{ translateX: pushX }] }}>
+        {screenContent}
+        {isSidebarOpen && (
           <Pressable
-            onPress={pickPhoto}
-            className="flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-surface-border py-6"
-          >
-            <Camera size={20} color={Colors.surfaceTextMuted} />
-            <Text className="text-sm font-medium text-surface-text-muted">Fotoğraf seç</Text>
-          </Pressable>
+            onPress={() => setIsSidebarOpen(false)}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+          />
         )}
-
-        <TextInput
-          value={ingredientsText}
-          onChangeText={setIngredientsText}
-          placeholder="Elindeki malzemeleri yaz (örn. 2 yumurta, biraz peynir)"
-          multiline
-          className="min-h-20 rounded-xl border border-surface-border p-3 text-foreground"
-          placeholderTextColor={Colors.surfaceTextMuted}
-        />
-
-        <PersonCountSelector />
-        <EquipmentSelector />
-        <RecipeModeSelector />
-
-        <Pressable
-          onPress={handleSubmit}
-          disabled={!canSubmit || status === "loading" || limitReached}
-          className="flex-row items-center justify-center gap-2 rounded-full bg-brand-orange py-3 disabled:opacity-50"
-        >
-          {status === "loading" ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text className="text-sm font-semibold text-white">Tarifi getir</Text>
-          )}
-        </Pressable>
-
-        {limitReached ? (
-          <Text className="text-center text-xs text-state-error">
-            Ücretsiz mod limitine ulaştın ({usageCount}/{FREE_USAGE_LIMIT}).
-          </Text>
-        ) : (
-          <Text className="text-center text-xs text-surface-text-muted">
-            Ücretsiz modda kullanılan istek: {usageCount}/{FREE_USAGE_LIMIT}
-          </Text>
-        )}
-
-        {error && <Text className="text-center text-sm text-state-error">{error}</Text>}
-      </ScrollView>
-    </KeyboardAvoidingView>
-    </SafeAreaView>
+      </Animated.View>
+    </View>
   );
 }
