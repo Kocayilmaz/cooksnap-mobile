@@ -13,18 +13,27 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import { Camera, Send, X } from "lucide-react-native";
+import { Camera, Menu, Send, X } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
-import { EQUIPMENT_KEYS } from "@/lib/redux/equipmentSlice";
-import { addHistoryEntry } from "@/lib/redux/historySlice";
+import { EQUIPMENT_KEYS, EQUIPMENT_LABELS, setEquipment, type Equipment } from "@/lib/redux/equipmentSlice";
+import { addHistoryEntry, type HistoryEntry } from "@/lib/redux/historySlice";
+import { setPersonCount } from "@/lib/redux/personCountSlice";
+import { setRecipeMode } from "@/lib/redux/recipeModeSlice";
 import { FREE_USAGE_LIMIT, incrementUsage } from "@/lib/redux/usageCounterSlice";
 import { requestRecipes as requestRecipesApi, ApiRequestError } from "@/lib/api/client";
 import EquipmentSelector from "@/components/EquipmentSelector";
 import PersonCountSelector from "@/components/PersonCountSelector";
 import RecipeModeSelector from "@/components/RecipeModeSelector";
 import RecipeMessageCard from "@/components/RecipeMessageCard";
+import ChatSidebarDrawer from "@/components/ChatSidebarDrawer";
 import { Colors } from "@/constants/theme";
 import type { ChatMessage } from "@/lib/types/chat";
+
+function buildEquipmentState(selected: Equipment[]): Record<Equipment, boolean> {
+  const state = {} as Record<Equipment, boolean>;
+  for (const key of EQUIPMENT_KEYS) state[key] = selected.includes(key);
+  return state;
+}
 
 function makeMessageId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -58,6 +67,7 @@ export default function ChatScreen() {
   const [followUpText, setFollowUpText] = useState("");
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const hasIngredientsText = ingredientsText.trim().length > 0;
   const hasStartedChat = messages.length > 0;
@@ -167,10 +177,72 @@ export default function ChatScreen() {
     setFollowUpError(null);
   }
 
+  // ne-pisirsem'deki app/chat/page.tsx handleSelectEntry ile aynı mantık —
+  // ChatSidebarDrawer'dan bir geçmiş sohbet seçilince o sohbetin bağlamına
+  // (kişi sayısı/ekipman/mod) geçilir ve mesaj dizisi yeniden kurulur.
+  function handleSelectEntry(entry: HistoryEntry) {
+    dispatch(setPersonCount(entry.personCount));
+    dispatch(setEquipment(buildEquipmentState(entry.equipment)));
+    dispatch(setRecipeMode(entry.mode));
+
+    if (entry.messages && entry.messages.length > 0) {
+      setMessages(entry.messages);
+      setStatus("idle");
+      setFollowUpError(null);
+      return;
+    }
+
+    const equipmentLabels = entry.equipment.map((key) => EQUIPMENT_LABELS[key]).join(", ");
+    setMessages([
+      {
+        id: makeMessageId(),
+        role: "user",
+        text: entry.ingredientsText || (entry.hadPhoto ? "Fotoğrafımdaki malzemelerle ne yapabilirim?" : ""),
+        createdAt: entry.createdAt,
+      },
+      {
+        id: makeMessageId(),
+        role: "assistant",
+        text:
+          entry.recipeTitles.length > 0
+            ? `${entry.recipeTitles.join(", ")} (${equipmentLabels} · ${entry.personCount} kişilik)`
+            : "Bu sohbet için kayıtlı tarif bulunamadı.",
+        createdAt: entry.createdAt,
+      },
+    ]);
+    setStatus("idle");
+    setFollowUpError(null);
+  }
+
   if (hasStartedChat) {
     return (
       <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
     <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View
+          style={{ borderBottomWidth: 1, borderBottomColor: Colors.surfaceBorder }}
+          className="flex-row items-center bg-surface-card px-3 py-2"
+        >
+          <Pressable
+            onPress={() => setIsSidebarOpen(true)}
+            hitSlop={8}
+            style={{ height: 36, width: 36 }}
+            className="items-center justify-center"
+          >
+            <Menu size={20} color={Colors.foreground} />
+          </Pressable>
+          <Text style={{ marginLeft: 8 }} className="text-sm font-semibold text-foreground">
+            CookSnap
+          </Text>
+        </View>
+
+        <ChatSidebarDrawer
+          visible={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          onNewChat={handleNewChat}
+          onSelectEntry={handleSelectEntry}
+          disabled={isSendingFollowUp}
+        />
+
         <ScrollView className="flex-1" contentContainerClassName="gap-3 p-4">
           {messages.map((message) =>
             message.role === "user" ? (
@@ -179,6 +251,11 @@ export default function ChatScreen() {
               </View>
             ) : (
               <View key={message.id} className="gap-3">
+                {message.text && (
+                  <View className="max-w-[85%] self-start rounded-2xl rounded-bl-md border border-surface-border bg-surface-card px-4 py-2.5">
+                    <Text className="text-sm text-foreground">{message.text}</Text>
+                  </View>
+                )}
                 {message.recipes?.map((recipe, index) => <RecipeMessageCard key={index} recipe={recipe} />)}
               </View>
             ),
@@ -219,6 +296,28 @@ export default function ChatScreen() {
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
     <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View
+          style={{ borderBottomWidth: 1, borderBottomColor: Colors.surfaceBorder }}
+          className="flex-row items-center bg-surface-card px-3 py-2"
+        >
+          <Pressable
+            onPress={() => setIsSidebarOpen(true)}
+            hitSlop={8}
+            style={{ height: 36, width: 36 }}
+            className="items-center justify-center"
+          >
+            <Menu size={20} color={Colors.foreground} />
+          </Pressable>
+        </View>
+
+        <ChatSidebarDrawer
+          visible={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          onNewChat={handleNewChat}
+          onSelectEntry={handleSelectEntry}
+          disabled={isSendingFollowUp}
+        />
+
       <ScrollView contentContainerClassName="gap-6 p-4 pb-10">
         <View className="gap-1">
           <Text className="text-center text-2xl font-semibold text-brand-red">CookSnap</Text>
