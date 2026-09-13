@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Alert, Dimensions, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { MessageCircle, Pin, PinOff, Search, SquarePen, Star, Trash2 } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import {
@@ -21,16 +22,21 @@ interface ChatSidebarDrawerProps {
   onNewChat: () => void;
   onSelectEntry: (entry: HistoryEntry) => void;
   disabled?: boolean;
+  /** Chat ekranında o an açık olan sohbetin id'si — listede o satırı
+   * vurgulamak için (bkz. HistoryRow'daki isSelected). */
+  selectedEntryId?: string | null;
 }
 
 function HistoryRow({
   entry,
   onPress,
   disabled,
+  isSelected,
 }: {
   entry: HistoryEntry;
   onPress: () => void;
   disabled?: boolean;
+  isSelected?: boolean;
 }) {
   const dispatch = useAppDispatch();
 
@@ -42,9 +48,21 @@ function HistoryRow({
   }
 
   return (
-    <View className="flex-row items-center gap-1">
+    <View
+      style={{
+        backgroundColor: isSelected ? "rgba(242,96,12,0.12)" : "transparent",
+        borderRadius: 10,
+        paddingHorizontal: isSelected ? 6 : 0,
+        marginHorizontal: isSelected ? -6 : 0,
+      }}
+      className="flex-row items-center gap-1"
+    >
       <Pressable onPress={onPress} disabled={disabled} style={{ minWidth: 0 }} className="flex-1 py-1.5">
-        <Text numberOfLines={1} className="text-sm font-medium text-foreground">
+        <Text
+          numberOfLines={1}
+          style={isSelected ? { color: Colors.brandOrangeDark } : undefined}
+          className={`text-sm ${isSelected ? "font-bold" : "font-medium text-foreground"}`}
+        >
           {historyEntryTitle(entry)}
         </Text>
         <Text numberOfLines={1} className="text-xs text-surface-text-muted">
@@ -88,7 +106,7 @@ function SectionLabel({ icon, children }: { icon: React.ReactNode; children: str
  * çıkarıyor. Üstte logo + arama, ortada kaydırılabilir favoriler/geçmiş
  * listesi, en altta sabit (kaydırmayan) mutfak zamanlayıcısı — kapatma
  * artık dışarı (ana ekrana) dokunarak yapılıyor, ayrı bir X butonu yok. */
-export default function ChatSidebarDrawer({ onClose, onNewChat, onSelectEntry, disabled }: ChatSidebarDrawerProps) {
+export default function ChatSidebarDrawer({ onClose, onNewChat, onSelectEntry, disabled, selectedEntryId }: ChatSidebarDrawerProps) {
   const dispatch = useAppDispatch();
   const history = useAppSelector((state) => state.history);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -169,6 +187,7 @@ export default function ChatSidebarDrawer({ onClose, onNewChat, onSelectEntry, d
         </Pressable>
       </View>
 
+      <View style={{ flex: 1 }}>
       <ScrollView className="flex-1" contentContainerClassName="gap-2 p-4" style={{ marginTop: 4 }}>
         {favorites.length > 0 && (
           <View className="gap-1.5">
@@ -178,6 +197,7 @@ export default function ChatSidebarDrawer({ onClose, onNewChat, onSelectEntry, d
                 key={entry.id}
                 entry={entry}
                 disabled={disabled}
+                isSelected={entry.id === selectedEntryId}
                 onPress={() => {
                   onSelectEntry(entry);
                   onClose();
@@ -205,6 +225,7 @@ export default function ChatSidebarDrawer({ onClose, onNewChat, onSelectEntry, d
                 key={entry.id}
                 entry={entry}
                 disabled={disabled}
+                isSelected={entry.id === selectedEntryId}
                 onPress={() => {
                   onSelectEntry(entry);
                   onClose();
@@ -220,6 +241,15 @@ export default function ChatSidebarDrawer({ onClose, onNewChat, onSelectEntry, d
           </Text>
         )}
       </ScrollView>
+
+        {/* Listenin en altındaki kesik satırı bulanıklaştırıp "daha var, kaydır"
+         * hissi veriyor — biraz yukarı kaydırınca o satır tam ve net görünür. */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={["rgba(255,250,245,0)", Colors.surfaceWarm]}
+          style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 40 }}
+        />
+      </View>
 
       <View
         style={{ borderTopWidth: 1, borderTopColor: Colors.surfaceBorder, paddingTop: 12, paddingBottom: 16 }}
