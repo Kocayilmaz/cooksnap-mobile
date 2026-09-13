@@ -38,7 +38,8 @@
         {
           "photosPermission": "Malzemelerinin fotoğrafını seçmek için galerine erişim gerekiyor."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
