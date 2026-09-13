@@ -16,7 +16,19 @@ export default function BlurIconButton({
   style?: StyleProp<ViewStyle>;
 }) {
   return (
-    <Pressable onPress={onPress} hitSlop={8} style={[{ borderRadius: size / 2, overflow: "hidden" }, style]}>
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      style={[
+        {
+          borderRadius: size / 2,
+          overflow: "hidden",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.6)",
+        },
+        style,
+      ]}
+    >
       <BlurView
         intensity={50}
         tint="light"
