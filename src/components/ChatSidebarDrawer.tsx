@@ -48,17 +48,27 @@ function HistoryRow({
   }
 
   return (
-    <View
-      style={{
-        backgroundColor: isSelected ? "rgba(23,23,23,0.08)" : "transparent",
-        borderRadius: 14,
-        paddingHorizontal: isSelected ? 8 : 0,
-        paddingVertical: isSelected ? 6 : 0,
-      }}
-      className="flex-row items-center gap-1"
-    >
+    <View style={{ position: "relative" }} className="flex-row items-center gap-1">
+      {isSelected && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: -6,
+            bottom: -6,
+            left: -8,
+            right: -8,
+            backgroundColor: "rgba(242,96,12,0.12)",
+            borderRadius: 20,
+          }}
+        />
+      )}
       <Pressable onPress={onPress} disabled={disabled} style={{ minWidth: 0 }} className="flex-1 py-1.5">
-        <Text numberOfLines={1} className="text-sm font-medium text-foreground">
+        <Text
+          numberOfLines={1}
+          style={isSelected ? { color: Colors.brandOrangeDark } : undefined}
+          className={`text-sm ${isSelected ? "font-bold" : "font-medium text-foreground"}`}
+        >
           {historyEntryTitle(entry)}
         </Text>
         <Text numberOfLines={1} className="text-xs text-surface-text-muted">
