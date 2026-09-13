@@ -16,7 +16,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import { Camera, Menu, Mic, MoreVertical, Plus, Search, Send, SquarePen, X } from "lucide-react-native";
+import { BlurView } from "expo-blur";
+import { Camera, ChevronDown, Menu, Mic, MoreVertical, Plus, Search, Send, SquarePen, X } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { EQUIPMENT_KEYS, EQUIPMENT_LABELS, setEquipment, type Equipment } from "@/lib/redux/equipmentSlice";
 import { addHistoryEntry, deleteHistoryEntry, toggleHistoryFavorite, type HistoryEntry } from "@/lib/redux/historySlice";
@@ -118,6 +119,8 @@ export default function ChatScreen() {
   const [isAttachOpen, setIsAttachOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const messagesScrollRef = useRef<ScrollView>(null);
   // Şu an ekranda görünen sohbetin historySlice'taki kaydı — yeni bir tarif
   // üretildiğinde (handleSubmit) ya da çekmeceden bir kayıt seçildiğinde
   // (handleSelectEntry) buraya yazılır; "..." menüsündeki Pinle/Sil bu id'yi
@@ -376,7 +379,18 @@ export default function ChatScreen() {
             </View>
           )}
 
-          <ScrollView className="flex-1" contentContainerClassName="gap-3 p-4" style={{ paddingTop: 64 }}>
+          <ScrollView
+            ref={messagesScrollRef}
+            className="flex-1"
+            contentContainerClassName="gap-3 p-4"
+            style={{ paddingTop: 64 }}
+            scrollEventThrottle={100}
+            onScroll={(event) => {
+              const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+              const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+              setShowScrollToBottom(distanceFromBottom > 200);
+            }}
+          >
             {visibleMessages.map((message) =>
               message.role === "user" ? (
                 <View key={message.id} className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-orange px-4 py-2.5">
@@ -400,6 +414,20 @@ export default function ChatScreen() {
             )}
             {followUpError && <Text className="text-center text-sm text-state-error">{followUpError}</Text>}
           </ScrollView>
+
+          {showScrollToBottom && (
+            <View style={{ position: "absolute", bottom: 12, right: 16 }}>
+              <BlurIconButton
+                size={36}
+                onPress={() => {
+                  messagesScrollRef.current?.scrollToEnd({ animated: true });
+                  setShowScrollToBottom(false);
+                }}
+              >
+                <ChevronDown size={18} color={Colors.foreground} />
+              </BlurIconButton>
+            </View>
+          )}
         </View>
 
         <View className="gap-2 p-3">
@@ -555,10 +583,20 @@ export default function ChatScreen() {
       <Animated.View style={{ flex: 1, transform: [{ translateX: pushX }] }}>
         {screenContent}
         {isSidebarOpen && (
-          <Pressable
-            onPress={() => setIsSidebarOpen(false)}
-            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-          />
+          <Animated.View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              opacity: pushX.interpolate({ inputRange: [0, DRAWER_WIDTH], outputRange: [0, 1] }),
+            }}
+          >
+            <Pressable onPress={() => setIsSidebarOpen(false)} style={{ flex: 1 }}>
+              <BlurView intensity={30} tint="dark" style={{ flex: 1 }} />
+            </Pressable>
+          </Animated.View>
         )}
       </Animated.View>
     </View>
