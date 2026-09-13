@@ -612,6 +612,7 @@ export default function ChatScreen() {
           onNewChat={handleNewChat}
           onSelectEntry={handleSelectEntry}
           disabled={isSendingFollowUp}
+          selectedEntryId={hasStartedChat ? currentEntryId : null}
         />
       </View>
 
