@@ -50,19 +50,15 @@ function HistoryRow({
   return (
     <View
       style={{
-        backgroundColor: isSelected ? "rgba(242,96,12,0.12)" : "transparent",
-        borderRadius: 20,
+        backgroundColor: isSelected ? "rgba(23,23,23,0.08)" : "transparent",
+        borderRadius: 14,
         paddingHorizontal: isSelected ? 8 : 0,
         paddingVertical: isSelected ? 6 : 0,
       }}
       className="flex-row items-center gap-1"
     >
       <Pressable onPress={onPress} disabled={disabled} style={{ minWidth: 0 }} className="flex-1 py-1.5">
-        <Text
-          numberOfLines={1}
-          style={isSelected ? { color: Colors.brandOrangeDark } : undefined}
-          className={`text-sm ${isSelected ? "font-bold" : "font-medium text-foreground"}`}
-        >
+        <Text numberOfLines={1} className="text-sm font-medium text-foreground">
           {historyEntryTitle(entry)}
         </Text>
         <Text numberOfLines={1} className="text-xs text-surface-text-muted">
