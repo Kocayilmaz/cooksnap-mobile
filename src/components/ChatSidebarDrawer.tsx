@@ -149,9 +149,9 @@ export default function ChatSidebarDrawer({ onClose, onNewChat, onSelectEntry, d
               onPress={() => setSearchOpen(true)}
               hitSlop={8}
               style={{ height: 32, width: 32 }}
-              className="items-center justify-center"
+              className="items-center justify-center rounded-full border border-surface-border bg-surface-card"
             >
-              <Search size={18} color={Colors.surfaceTextMuted} />
+              <Search size={16} color={Colors.surfaceTextMuted} />
             </Pressable>
           )}
         </View>
