@@ -23,8 +23,8 @@ export default function BlurIconButton({
         {
           borderRadius: size / 2,
           overflow: "hidden",
-          borderWidth: 1,
-          borderColor: "rgba(255,255,255,0.6)",
+          borderWidth: 1.5,
+          borderColor: "rgba(23,23,23,0.22)",
         },
         style,
       ]}
