@@ -51,9 +51,9 @@ function HistoryRow({
     <View
       style={{
         backgroundColor: isSelected ? "rgba(242,96,12,0.12)" : "transparent",
-        borderRadius: 10,
-        paddingHorizontal: isSelected ? 6 : 0,
-        marginHorizontal: isSelected ? -6 : 0,
+        borderRadius: 16,
+        paddingHorizontal: isSelected ? 8 : 0,
+        marginHorizontal: isSelected ? -8 : 0,
       }}
       className="flex-row items-center gap-1"
     >
