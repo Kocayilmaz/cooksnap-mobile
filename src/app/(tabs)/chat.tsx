@@ -29,10 +29,12 @@ import EquipmentSelector from "@/components/EquipmentSelector";
 import PersonCountSelector from "@/components/PersonCountSelector";
 import RecipeModeSelector from "@/components/RecipeModeSelector";
 import RecipeMessageCard from "@/components/RecipeMessageCard";
+import ChatMessageActions from "@/components/ChatMessageActions";
 import ChatSidebarDrawer, { DRAWER_WIDTH } from "@/components/ChatSidebarDrawer";
 import BlurIconButton from "@/components/BlurIconButton";
 import ChatOptionsMenu from "@/components/ChatOptionsMenu";
 import AttachMenu from "@/components/AttachMenu";
+import { notify } from "@/lib/notify";
 import { Colors } from "@/constants/theme";
 import type { ChatMessage } from "@/lib/types/chat";
 
@@ -317,6 +319,32 @@ export default function ChatScreen() {
     }
   }
 
+  // ChatGPT'nin "branch in new chat" özelliğinin karşılığı — o mesaja kadarki
+  // konuşmayı ayrı, bağımsız bir sohbet kaydı olarak kaydedip oraya geçer
+  // (bkz. ChatMessageActions'taki dallanma ikonu).
+  function handleBranchFrom(messageId: string) {
+    const index = messages.findIndex((message) => message.id === messageId);
+    if (index === -1) return;
+
+    const branchMessages = messages.slice(0, index + 1);
+    const newEntryId = makeMessageId();
+    setMessages(branchMessages);
+    setCurrentEntryId(newEntryId);
+    dispatch(
+      addHistoryEntry({
+        id: newEntryId,
+        ingredientsText: currentEntry?.ingredientsText,
+        hadPhoto: currentEntry?.hadPhoto ?? false,
+        personCount,
+        equipment: EQUIPMENT_KEYS.filter((key) => equipmentState[key]),
+        mode: recipeMode,
+        recipeTitles: branchMessages.flatMap((message) => message.recipes?.map((recipe) => recipe.title) ?? []),
+        messages: branchMessages,
+      }),
+    );
+    notify("Sohbet yeni bir dal olarak kaydedildi");
+  }
+
   function handleDeleteCurrentChat() {
     Alert.alert("Sohbeti sil", "Bu sohbeti silmek istediğine emin misin?", [
       { text: "Vazgeç", style: "cancel" },
@@ -404,6 +432,13 @@ export default function ChatScreen() {
                     </View>
                   )}
                   {message.recipes?.map((recipe, index) => <RecipeMessageCard key={index} recipe={recipe} />)}
+                  {message.recipes && message.recipes.length > 0 && (
+                    <ChatMessageActions
+                      recipes={message.recipes}
+                      createdAt={message.createdAt}
+                      onBranch={() => handleBranchFrom(message.id)}
+                    />
+                  )}
                 </View>
               ),
             )}
