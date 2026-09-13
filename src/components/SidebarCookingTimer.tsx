@@ -73,8 +73,8 @@ export default function SidebarCookingTimer() {
   return (
     <View className="gap-2">
       <View className="flex-row items-center gap-1.5">
-        <TimerIcon size={12} color={Colors.surfaceTextMuted} />
-        <Text style={{ textTransform: "uppercase" }} className="text-xs font-bold text-surface-text-muted">
+        <TimerIcon size={15} color={Colors.brandOrange} />
+        <Text style={{ textTransform: "uppercase", letterSpacing: 0.5 }} className="text-sm font-bold text-foreground">
           Mutfak zamanlayıcısı
         </Text>
       </View>
