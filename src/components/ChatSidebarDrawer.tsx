@@ -87,7 +87,12 @@ function HistoryRow({
           <Pin size={14} color={Colors.surfaceTextMuted} />
         )}
       </Pressable>
-      <Pressable onPress={handleDelete} hitSlop={8} style={{ height: 28, width: 28 }} className="items-center justify-center">
+      <Pressable
+        onPress={handleDelete}
+        hitSlop={8}
+        style={{ height: 28, width: 28, marginRight: isSelected ? 4 : 0 }}
+        className="items-center justify-center"
+      >
         <Trash2 size={14} color={Colors.stateError} />
       </Pressable>
     </View>
