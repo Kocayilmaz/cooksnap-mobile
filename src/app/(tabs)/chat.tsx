@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { BlurView } from "expo-blur";
+import * as Haptics from "expo-haptics";
 import { Camera, ChevronDown, Menu, Mic, MoreVertical, Plus, Search, Send, SquarePen, X } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { EQUIPMENT_KEYS, EQUIPMENT_LABELS, setEquipment, type Equipment } from "@/lib/redux/equipmentSlice";
@@ -431,13 +432,14 @@ export default function ChatScreen() {
               message.role === "user" ? (
                 <Pressable
                   key={message.id}
-                  onLongPress={(event) =>
+                  onLongPress={(event) => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     setLongPressMenu({
                       visible: true,
                       anchor: { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY },
                       text: message.text ?? "",
-                    })
-                  }
+                    });
+                  }}
                   className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-orange px-4 py-2.5"
                 >
                   <Text className="text-sm text-white">{message.text}</Text>
