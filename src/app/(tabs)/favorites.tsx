@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { ScrollView, Text, View, Pressable } from "react-native";
+import { ScrollView, Text, TextInput, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { FolderHeart, Heart, Star } from "lucide-react-native";
+import { ChefHat, Clock, FolderHeart, Heart, LayoutGrid, MessageCircle, Search, Star } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { toggleFavorite } from "@/lib/redux/favoritesSlice";
 import { toggleMealFavorite } from "@/lib/redux/mealFavoritesSlice";
@@ -14,6 +14,14 @@ import { getAreaLabel } from "@/lib/mealdb/areaMeta";
 import { Colors } from "@/constants/theme";
 
 type FavoritesTab = "favoriler" | "koleksiyonlar";
+type FavoritesFilter = "tumu" | "kaydedilenler" | "sohbetler" | "tarifler";
+
+const FILTERS: { key: FavoritesFilter; label: string; icon: typeof LayoutGrid }[] = [
+  { key: "tumu", label: "Tümü", icon: LayoutGrid },
+  { key: "kaydedilenler", label: "Son Eklenenler", icon: Clock },
+  { key: "sohbetler", label: "Sohbetler", icon: MessageCircle },
+  { key: "tarifler", label: "Tarifler", icon: ChefHat },
+];
 
 /**
  * ne-pisirsem'deki app/favorites/page.tsx'in mobil karşılığı — aynı ayrım:
@@ -31,16 +39,27 @@ export default function FavoritesScreen() {
   const mealFavorites = useAppSelector((state) => state.mealFavorites);
   const history = useAppSelector((state) => state.history);
   const [activeTab, setActiveTab] = useState<FavoritesTab>("favoriler");
+  const [activeFilter, setActiveFilter] = useState<FavoritesFilter>("tumu");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const allRecipes = Object.values(favorites).sort((a, b) => b.savedAt - a.savedAt);
-  const savedMeals = Object.values(mealFavorites).sort((a, b) => b.savedAt - a.savedAt);
-  const favoriteChats = history.filter((entry) => entry.isFavorite);
+  const term = searchQuery.trim().toLowerCase();
+  const showSavedMeals = activeFilter === "tumu" || activeFilter === "kaydedilenler";
+  const showChats = activeFilter === "tumu" || activeFilter === "sohbetler";
+  const showRecipes = activeFilter === "tumu" || activeFilter === "tarifler";
+
+  const allRecipes = Object.values(favorites)
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .filter((recipe) => !term || recipe.title.toLowerCase().includes(term));
+  const savedMeals = Object.values(mealFavorites)
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .filter((meal) => !term || meal.name.toLowerCase().includes(term));
+  const favoriteChats = history
+    .filter((entry) => entry.isFavorite)
+    .filter((entry) => !term || historyEntryTitle(entry).toLowerCase().includes(term));
 
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
-      <View className="gap-4 px-4 pt-4">
-        <Text className="text-center text-2xl font-bold text-brand-red">Favoriler</Text>
-
+      <View className="gap-3 px-4 pt-4">
         <View className="flex-row gap-2 rounded-full bg-surface-card p-1">
           {(
             [
@@ -60,6 +79,41 @@ export default function FavoritesScreen() {
             );
           })}
         </View>
+
+        {activeTab === "favoriler" && (
+          <View className="flex-row items-center gap-2">
+            <View className="flex-row items-center gap-1.5 rounded-full border border-surface-border bg-surface-card px-3 py-2" style={{ width: 130 }}>
+              <Search size={14} color={Colors.surfaceTextMuted} />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Ara"
+                placeholderTextColor={Colors.surfaceTextMuted}
+                className="flex-1 text-xs text-foreground"
+              />
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2">
+              {FILTERS.map((filter) => {
+                const active = activeFilter === filter.key;
+                const Icon = filter.icon;
+                return (
+                  <Pressable
+                    key={filter.key}
+                    onPress={() => setActiveFilter(filter.key)}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: active ? Colors.brandOrange : Colors.surfaceBorder,
+                    }}
+                    className={`flex-row items-center gap-1.5 rounded-full px-3 py-2 ${active ? "bg-brand-orange" : "bg-surface-card"}`}
+                  >
+                    <Icon size={13} color={active ? "#ffffff" : Colors.surfaceTextMuted} />
+                    <Text className={`text-xs font-medium ${active ? "text-white" : "text-surface-text-muted"}`}>{filter.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {activeTab === "koleksiyonlar" ? (
@@ -72,6 +126,7 @@ export default function FavoritesScreen() {
         </View>
       ) : (
         <ScrollView contentContainerClassName="gap-6 p-4 pb-10">
+          {showSavedMeals && (
           <View className="gap-3 rounded-2xl bg-surface-card p-5 shadow-sm">
             <Text className="text-sm font-semibold text-foreground">Kaydedilen Tarifler</Text>
             {savedMeals.length === 0 ? (
@@ -105,8 +160,9 @@ export default function FavoritesScreen() {
               </View>
             )}
           </View>
+          )}
 
-          {favoriteChats.length > 0 && (
+          {showChats && favoriteChats.length > 0 && (
             <View className="gap-3 rounded-2xl bg-surface-card p-5 shadow-sm">
               <Text className="text-sm font-semibold text-foreground">Sohbet Favorileri</Text>
               <Text className="text-xs text-surface-text-muted">
@@ -128,6 +184,7 @@ export default function FavoritesScreen() {
             </View>
           )}
 
+          {showRecipes && (
           <View className="gap-3 rounded-2xl bg-surface-card p-5 shadow-sm">
             <Text className="text-sm font-semibold text-foreground">Tarif Favorileri</Text>
             {allRecipes.length === 0 ? (
@@ -152,6 +209,7 @@ export default function FavoritesScreen() {
               </View>
             )}
           </View>
+          )}
         </ScrollView>
       )}
     </SafeAreaView>
