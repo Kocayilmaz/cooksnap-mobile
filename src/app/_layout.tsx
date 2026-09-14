@@ -34,6 +34,7 @@ function RootNavigation() {
 
       <Stack.Protected guard={isLoggedIn}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="meal/[id]" options={{ headerShown: false }} />
       </Stack.Protected>
     </Stack>
   );
