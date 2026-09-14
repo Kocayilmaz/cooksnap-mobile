@@ -127,10 +127,16 @@ export default function ChatScreen() {
   const messagesScrollRef = useRef<ScrollView>(null);
   // Kullanıcı mesaj balonuna uzun basınca açılan Kopyala/Paylaş menüsü
   // (bkz. MessageActionMenu) — anchor, dokunulan ekran noktası.
-  const [longPressMenu, setLongPressMenu] = useState<{ visible: boolean; anchor: { x: number; y: number } | null; text: string }>({
+  const [longPressMenu, setLongPressMenu] = useState<{
+    visible: boolean;
+    anchor: { x: number; y: number } | null;
+    text: string;
+    createdAt: number;
+  }>({
     visible: false,
     anchor: null,
     text: "",
+    createdAt: Date.now(),
   });
   // Şu an ekranda görünen sohbetin historySlice'taki kaydı — yeni bir tarif
   // üretildiğinde (handleSubmit) ya da çekmeceden bir kayıt seçildiğinde
@@ -438,6 +444,7 @@ export default function ChatScreen() {
                       visible: true,
                       anchor: { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY },
                       text: message.text ?? "",
+                      createdAt: message.createdAt,
                     });
                   }}
                   className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-orange px-4 py-2.5"
@@ -549,6 +556,7 @@ export default function ChatScreen() {
         visible={longPressMenu.visible}
         anchor={longPressMenu.anchor}
         text={longPressMenu.text}
+        createdAt={longPressMenu.createdAt}
         onClose={() => setLongPressMenu((state) => ({ ...state, visible: false }))}
       />
     </SafeAreaView>

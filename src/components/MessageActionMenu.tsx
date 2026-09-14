@@ -5,30 +5,34 @@ import { Copy, Share2 } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import { Colors } from "@/constants/theme";
 import { notify } from "@/lib/notify";
+import { formatMessageTimestamp } from "@/lib/relativeTime";
 
 interface MessageActionMenuProps {
   visible: boolean;
   onClose: () => void;
   text: string;
-  /** Uzun basılan noktanın ekran koordinatı — balonun kopyası ve menü oraya
+  createdAt: number;
+  /** Uzun basılan noktanın ekran koordinatı — grup (tarih/balon/menü) oraya
    * yakın açılır. */
   anchor: { x: number; y: number } | null;
 }
 
 const MENU_WIDTH = 190;
-const BUBBLE_MAX_WIDTH = 260;
+const GROUP_WIDTH = 260;
 
 /**
  * Mesaj balonuna uzun basınca açılan Kopyala/Paylaş menüsü — ChatGPT'nin
  * uzun-basma davranışının karşılığı (bkz. app/(tabs)/chat.tsx, kullanıcının
- * kendi mesaj balonlarında kullanılıyor). Balonun kendisi biraz büyütülüp
- * öne çıkarılmış bir kopyası olarak gösteriliyor, arkaplan koyu+bulanık,
- * altındaki seçenek çubuğu da buzlu cam görünümünde — dokunuşta titreşim
- * (bkz. Haptics.impactAsync, chat.tsx'teki onLongPress) telefonun kendi
- * dokunsal geri bildirimi değil, biz tetikliyoruz.
+ * kendi mesaj balonlarında kullanılıyor). Arkaplan tamamen koyu+bulanık
+ * olduğu için asıl ekrandaki içerik hiç görünmüyor — üstte tarih, ortada
+ * balonun büyütülmüş kopyası, altında buzlu cam görünümünde seçenekler tek
+ * bir grup halinde diziliyor (ChatGPT'nin "Yesterday, 15:14" + balon + menü
+ * düzeninin karşılığı). Dokunuşta titreşim (bkz. Haptics.impactAsync,
+ * chat.tsx'teki onLongPress) telefonun kendi dokunsal geri bildirimi değil,
+ * biz tetikliyoruz.
  */
-export default function MessageActionMenu({ visible, onClose, text, anchor }: MessageActionMenuProps) {
-  const { width, height } = Dimensions.get("window");
+export default function MessageActionMenu({ visible, onClose, text, createdAt, anchor }: MessageActionMenuProps) {
+  const { height } = Dimensions.get("window");
   const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -56,23 +60,23 @@ export default function MessageActionMenu({ visible, onClose, text, anchor }: Me
   }
 
   if (!anchor) return null;
-  const left = Math.min(Math.max(anchor.x - BUBBLE_MAX_WIDTH, 12), width - BUBBLE_MAX_WIDTH - 12);
-  const top = Math.min(Math.max(anchor.y - 70, 60), height - 260);
+  const top = Math.min(Math.max(anchor.y - 130, 60), height - 320);
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <Pressable onPress={onClose} style={{ flex: 1 }}>
         <Animated.View style={{ flex: 1, opacity: progress }}>
-          <BlurView intensity={35} tint="dark" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
+          <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(15,10,8,0.78)" }} />
+          <BlurView intensity={40} tint="dark" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
         </Animated.View>
 
         <Animated.View
           style={{
             position: "absolute",
-            left,
+            right: 16,
             top,
-            width: BUBBLE_MAX_WIDTH,
-            gap: 10,
+            width: GROUP_WIDTH,
+            gap: 8,
             opacity: progress,
             transform: [
               { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) },
@@ -80,12 +84,16 @@ export default function MessageActionMenu({ visible, onClose, text, anchor }: Me
             ],
           }}
         >
+          <Text style={{ alignSelf: "flex-end", color: "rgba(255,255,255,0.75)" }} className="text-xs font-medium">
+            {formatMessageTimestamp(createdAt)}
+          </Text>
+
           <View
             style={{
               alignSelf: "flex-end",
               maxWidth: "100%",
               shadowColor: "#000",
-              shadowOpacity: 0.25,
+              shadowOpacity: 0.3,
               shadowRadius: 16,
               shadowOffset: { width: 0, height: 6 },
               elevation: 10,
@@ -99,21 +107,22 @@ export default function MessageActionMenu({ visible, onClose, text, anchor }: Me
             style={{
               alignSelf: "flex-end",
               width: MENU_WIDTH,
+              marginTop: 4,
               borderRadius: 16,
               overflow: "hidden",
               shadowColor: "#000",
-              shadowOpacity: 0.2,
+              shadowOpacity: 0.25,
               shadowRadius: 14,
               shadowOffset: { width: 0, height: 6 },
               elevation: 10,
             }}
           >
-            <BlurView intensity={70} tint="light">
+            <BlurView intensity={80} tint="light">
               <Pressable onPress={handleCopy} className="flex-row items-center gap-2 px-4 py-3">
                 <Copy size={16} color={Colors.foreground} />
                 <Text className="text-sm font-medium text-foreground">Kopyala</Text>
               </Pressable>
-              <View style={{ height: 1, backgroundColor: "rgba(23,23,23,0.08)" }} />
+              <View style={{ height: 1, backgroundColor: "rgba(23,23,23,0.1)" }} />
               <Pressable onPress={handleShare} className="flex-row items-center gap-2 px-4 py-3">
                 <Share2 size={16} color={Colors.foreground} />
                 <Text className="text-sm font-medium text-foreground">Paylaş</Text>
