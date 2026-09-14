@@ -3,15 +3,16 @@ import { ScrollView, Text, TextInput, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { ChefHat, Clock, FolderHeart, Heart, LayoutGrid, ListFilter, MessageCircle, Pencil, Search, Star } from "lucide-react-native";
+import { ChefHat, Clock, FolderHeart, Heart, LayoutGrid, ListFilter, MessageCircle, Pencil, Search, Star, Wrench } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { toggleFavorite } from "@/lib/redux/favoritesSlice";
 import { toggleMealFavorite } from "@/lib/redux/mealFavoritesSlice";
-import { EQUIPMENT_LABELS } from "@/lib/redux/equipmentSlice";
+import { EQUIPMENT_KEYS, EQUIPMENT_LABELS } from "@/lib/redux/equipmentSlice";
 import { historyEntryTitle, summarizeHistoryEntry, toggleHistoryFavorite } from "@/lib/redux/historySlice";
 import { getCategoryLabel } from "@/lib/mealdb/categoryMeta";
 import { getAreaLabel } from "@/lib/mealdb/areaMeta";
 import CategoryFilterModal from "@/components/CategoryFilterModal";
+import ChecklistFilterModal from "@/components/ChecklistFilterModal";
 import EditFavoritesModal from "@/components/EditFavoritesModal";
 import { Colors } from "@/constants/theme";
 
@@ -47,7 +48,9 @@ export default function FavoritesScreen() {
   const [activeFilter, setActiveFilter] = useState<FavoritesFilter>("tumu");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const term = searchQuery.trim().toLowerCase();
@@ -57,7 +60,8 @@ export default function FavoritesScreen() {
 
   const allRecipes = Object.values(favorites)
     .sort((a, b) => b.savedAt - a.savedAt)
-    .filter((recipe) => !term || recipe.title.toLowerCase().includes(term));
+    .filter((recipe) => !term || recipe.title.toLowerCase().includes(term))
+    .filter((recipe) => selectedEquipment.length === 0 || selectedEquipment.includes(recipe.equipment));
   const savedMeals = Object.values(mealFavorites)
     .sort((a, b) => b.savedAt - a.savedAt)
     .filter((meal) => !term || meal.name.toLowerCase().includes(term))
@@ -90,64 +94,79 @@ export default function FavoritesScreen() {
         </View>
 
         {activeTab === "favoriler" && (
-          <>
-            <View className="flex-row items-center gap-2">
-              <View
-                style={{ height: CHIP_HEIGHT }}
-                className="flex-row items-center gap-1.5 rounded-full border border-surface-border bg-surface-card px-3"
-              >
-                <Search size={14} color={Colors.brandOrange} />
-                <TextInput
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  placeholder="Ara"
-                  placeholderTextColor={Colors.surfaceTextMuted}
-                  style={{ width: 60 }}
-                  className="text-xs text-foreground"
-                />
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2">
-                {FILTERS.map((filter) => {
-                  const active = activeFilter === filter.key;
-                  const Icon = filter.icon;
-                  return (
-                    <Pressable
-                      key={filter.key}
-                      onPress={() => setActiveFilter(filter.key)}
-                      style={{
-                        height: CHIP_HEIGHT,
-                        borderWidth: 1,
-                        borderColor: active ? Colors.brandOrange : Colors.surfaceBorder,
-                      }}
-                      className={`flex-row items-center gap-1.5 rounded-full px-3 ${active ? "bg-brand-orange" : "bg-surface-card"}`}
-                    >
-                      <Icon size={13} color={active ? "#ffffff" : Colors.brandOrange} />
-                      <Text className={`text-xs font-medium ${active ? "text-white" : "text-surface-text-muted"}`}>{filter.label}</Text>
-                    </Pressable>
-                  );
-                })}
-                <Pressable
-                  onPress={() => setIsCategoryModalOpen(true)}
-                  style={{
-                    height: CHIP_HEIGHT,
-                    borderWidth: 1,
-                    borderColor: selectedCategories.length > 0 ? Colors.brandOrange : Colors.surfaceBorder,
-                  }}
-                  className={`flex-row items-center gap-1.5 rounded-full px-3 ${selectedCategories.length > 0 ? "bg-brand-orange" : "bg-surface-card"}`}
-                >
-                  <ListFilter size={13} color={selectedCategories.length > 0 ? "#ffffff" : Colors.brandOrange} />
-                  <Text className={`text-xs font-medium ${selectedCategories.length > 0 ? "text-white" : "text-surface-text-muted"}`}>
-                    Kategori{selectedCategories.length > 0 ? ` (${selectedCategories.length})` : ""}
-                  </Text>
-                </Pressable>
-              </ScrollView>
+          <View className="flex-row items-center gap-2">
+            <View
+              style={{ height: CHIP_HEIGHT }}
+              className="flex-row items-center gap-1.5 rounded-full border border-surface-border bg-surface-card px-3"
+            >
+              <Search size={14} color={Colors.brandOrange} />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Ara"
+                placeholderTextColor={Colors.surfaceTextMuted}
+                style={{ width: 60 }}
+                className="text-xs text-foreground"
+              />
             </View>
-
-            <Pressable onPress={() => setIsEditModalOpen(true)} className="flex-row items-center justify-end gap-1.5">
-              <Pencil size={13} color={Colors.brandOrange} />
-              <Text className="text-xs font-semibold text-brand-orange">Favorilerini düzenle</Text>
-            </Pressable>
-          </>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2">
+              {FILTERS.map((filter) => {
+                const active = activeFilter === filter.key;
+                const Icon = filter.icon;
+                return (
+                  <Pressable
+                    key={filter.key}
+                    onPress={() => setActiveFilter(filter.key)}
+                    style={{
+                      height: CHIP_HEIGHT,
+                      borderWidth: 1,
+                      borderColor: active ? Colors.brandOrange : Colors.surfaceBorder,
+                    }}
+                    className={`flex-row items-center gap-1.5 rounded-full px-3 ${active ? "bg-brand-orange" : "bg-surface-card"}`}
+                  >
+                    <Icon size={13} color={active ? "#ffffff" : Colors.brandOrange} />
+                    <Text className={`text-xs font-medium ${active ? "text-white" : "text-surface-text-muted"}`}>{filter.label}</Text>
+                  </Pressable>
+                );
+              })}
+              <Pressable
+                onPress={() => setIsCategoryModalOpen(true)}
+                style={{
+                  height: CHIP_HEIGHT,
+                  borderWidth: 1,
+                  borderColor: selectedCategories.length > 0 ? Colors.brandOrange : Colors.surfaceBorder,
+                }}
+                className={`flex-row items-center gap-1.5 rounded-full px-3 ${selectedCategories.length > 0 ? "bg-brand-orange" : "bg-surface-card"}`}
+              >
+                <ListFilter size={13} color={selectedCategories.length > 0 ? "#ffffff" : Colors.brandOrange} />
+                <Text className={`text-xs font-medium ${selectedCategories.length > 0 ? "text-white" : "text-surface-text-muted"}`}>
+                  Kategori{selectedCategories.length > 0 ? ` (${selectedCategories.length})` : ""}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setIsEquipmentModalOpen(true)}
+                style={{
+                  height: CHIP_HEIGHT,
+                  borderWidth: 1,
+                  borderColor: selectedEquipment.length > 0 ? Colors.brandOrange : Colors.surfaceBorder,
+                }}
+                className={`flex-row items-center gap-1.5 rounded-full px-3 ${selectedEquipment.length > 0 ? "bg-brand-orange" : "bg-surface-card"}`}
+              >
+                <Wrench size={13} color={selectedEquipment.length > 0 ? "#ffffff" : Colors.brandOrange} />
+                <Text className={`text-xs font-medium ${selectedEquipment.length > 0 ? "text-white" : "text-surface-text-muted"}`}>
+                  Ekipmana Göre{selectedEquipment.length > 0 ? ` (${selectedEquipment.length})` : ""}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setIsEditModalOpen(true)}
+                style={{ height: CHIP_HEIGHT, borderWidth: 1, borderColor: Colors.surfaceBorder }}
+                className="flex-row items-center gap-1.5 rounded-full bg-surface-card px-3"
+              >
+                <Pencil size={13} color={Colors.brandOrange} />
+                <Text className="text-xs font-medium text-surface-text-muted">Favorilerini düzenle</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
         )}
       </View>
 
@@ -253,6 +272,15 @@ export default function FavoritesScreen() {
         onClose={() => setIsCategoryModalOpen(false)}
         selected={selectedCategories}
         onApply={setSelectedCategories}
+      />
+      <ChecklistFilterModal
+        visible={isEquipmentModalOpen}
+        onClose={() => setIsEquipmentModalOpen(false)}
+        title="Ekipmana Göre"
+        searchable={false}
+        options={EQUIPMENT_KEYS.map((key) => ({ key, label: EQUIPMENT_LABELS[key] }))}
+        selected={selectedEquipment}
+        onApply={setSelectedEquipment}
       />
       <EditFavoritesModal visible={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} />
     </SafeAreaView>
