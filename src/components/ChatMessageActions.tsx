@@ -12,7 +12,13 @@ import { Colors } from "@/constants/theme";
 import type { RecipeSuggestion } from "@/lib/types/recipe";
 
 interface ChatMessageActionsProps {
-  recipes: RecipeSuggestion[];
+  /** Yapılandırılmış tarifler varsa (AI'nın önerdiği kartlar) kopyala/indir/
+   * yıldızla bunları kullanır. */
+  recipes?: RecipeSuggestion[];
+  /** Tarif kartı olmayan, düz metin cevaplar için (bkz. app/(tabs)/chat.tsx
+   * handleSelectEntry'nin ürettiği özet mesajlar) — yıldız gösterilmez,
+   * çünkü favorileme yapılandırılmış tarif verisine ihtiyaç duyuyor. */
+  text?: string;
   createdAt: number;
   onBranch: () => void;
 }
@@ -25,23 +31,25 @@ interface ChatMessageActionsProps {
  * sohbet olarak kaydedip oraya geçiyor — ChatGPT'nin "branch in new chat"
  * özelliğinin karşılığı (bkz. handleBranchFrom, app/(tabs)/chat.tsx).
  */
-export default function ChatMessageActions({ recipes, createdAt, onBranch }: ChatMessageActionsProps) {
+export default function ChatMessageActions({ recipes = [], text, createdAt, onBranch }: ChatMessageActionsProps) {
   const dispatch = useAppDispatch();
   const favorites = useAppSelector((state) => state.favorites);
-  const isFavorite = recipes.length > 0 && recipes.every((recipe) => Boolean(favorites[makeFavoriteId(recipe.equipment, recipe.title)]));
+  const hasRecipes = recipes.length > 0;
+  const isFavorite = hasRecipes && recipes.every((recipe) => Boolean(favorites[makeFavoriteId(recipe.equipment, recipe.title)]));
+  const contentText = hasRecipes ? recipesToText(recipes) : text ?? "";
 
   async function handleCopy() {
-    await Clipboard.setStringAsync(recipesToText(recipes));
-    notify("Tarif panoya kopyalandı");
+    await Clipboard.setStringAsync(contentText);
+    notify("Metin panoya kopyalandı");
   }
 
   async function handleDownload() {
     try {
-      const safeName = (recipes[0]?.title ?? "tarifler").replace(/[^\p{L}\p{N}]+/gu, "-").toLowerCase();
-      const file = new File(Paths.cache, `${safeName || "tarifler"}.txt`);
+      const safeName = (recipes[0]?.title ?? "sohbet").replace(/[^\p{L}\p{N}]+/gu, "-").toLowerCase();
+      const file = new File(Paths.cache, `${safeName || "sohbet"}.txt`);
       if (file.exists) file.delete();
       file.create();
-      file.write(recipesToText(recipes));
+      file.write(contentText);
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(file.uri, { mimeType: "text/plain", dialogTitle: recipes[0]?.title });
@@ -49,7 +57,7 @@ export default function ChatMessageActions({ recipes, createdAt, onBranch }: Cha
         notify(`Kaydedildi: ${file.uri}`);
       }
     } catch {
-      notify("Tarif indirilemedi.");
+      notify("İndirilemedi.");
     }
   }
 
@@ -73,9 +81,11 @@ export default function ChatMessageActions({ recipes, createdAt, onBranch }: Cha
         <Pressable onPress={handleDownload} hitSlop={8}>
           <Download size={15} color={Colors.surfaceTextMuted} />
         </Pressable>
-        <Pressable onPress={handleToggleFavorite} hitSlop={8}>
-          <Star size={15} color={Colors.brandOrange} fill={isFavorite ? Colors.brandOrange : "none"} />
-        </Pressable>
+        {hasRecipes && (
+          <Pressable onPress={handleToggleFavorite} hitSlop={8}>
+            <Star size={15} color={Colors.brandOrange} fill={isFavorite ? Colors.brandOrange : "none"} />
+          </Pressable>
+        )}
         <Pressable onPress={onBranch} hitSlop={8}>
           <GitBranch size={15} color={Colors.surfaceTextMuted} />
         </Pressable>
