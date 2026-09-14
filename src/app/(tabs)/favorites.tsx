@@ -3,7 +3,7 @@ import { ScrollView, Text, TextInput, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { ChefHat, Clock, FolderHeart, Heart, LayoutGrid, MessageCircle, Search, Star } from "lucide-react-native";
+import { ChefHat, Clock, FolderHeart, Heart, LayoutGrid, ListFilter, MessageCircle, Pencil, Search, Star } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { toggleFavorite } from "@/lib/redux/favoritesSlice";
 import { toggleMealFavorite } from "@/lib/redux/mealFavoritesSlice";
@@ -11,6 +11,8 @@ import { EQUIPMENT_LABELS } from "@/lib/redux/equipmentSlice";
 import { historyEntryTitle, summarizeHistoryEntry, toggleHistoryFavorite } from "@/lib/redux/historySlice";
 import { getCategoryLabel } from "@/lib/mealdb/categoryMeta";
 import { getAreaLabel } from "@/lib/mealdb/areaMeta";
+import CategoryFilterModal from "@/components/CategoryFilterModal";
+import EditFavoritesModal from "@/components/EditFavoritesModal";
 import { Colors } from "@/constants/theme";
 
 type FavoritesTab = "favoriler" | "koleksiyonlar";
@@ -18,10 +20,12 @@ type FavoritesFilter = "tumu" | "kaydedilenler" | "sohbetler" | "tarifler";
 
 const FILTERS: { key: FavoritesFilter; label: string; icon: typeof LayoutGrid }[] = [
   { key: "tumu", label: "Tümü", icon: LayoutGrid },
-  { key: "kaydedilenler", label: "Son Eklenenler", icon: Clock },
-  { key: "sohbetler", label: "Sohbetler", icon: MessageCircle },
-  { key: "tarifler", label: "Tarifler", icon: ChefHat },
+  { key: "kaydedilenler", label: "Kaydedilen Tarifler", icon: Clock },
+  { key: "sohbetler", label: "Sohbet Favorileri", icon: MessageCircle },
+  { key: "tarifler", label: "Tarif Favorileri", icon: ChefHat },
 ];
+
+const CHIP_HEIGHT = 40;
 
 /**
  * ne-pisirsem'deki app/favorites/page.tsx'in mobil karşılığı — aynı ayrım:
@@ -30,7 +34,8 @@ const FILTERS: { key: FavoritesFilter; label: string; icon: typeof LayoutGrid }[
  * konuşmalar) ve en altta "Tarif Favorileri" (chat'te üretilen, yıldızlanan
  * tarifler) ayrı bölümler. Üstte "Favoriler"/"Koleksiyonlar" sekmeleri var —
  * Koleksiyonlar şimdilik yer tutucu, kullanıcı tanımlı koleksiyon özelliği
- * henüz veri modelinde yok.
+ * henüz veri modelinde yok. "Favorilerini düzenle" (bkz. EditFavoritesModal)
+ * toplu seçip silme/koleksiyona ekleme için ayrı bir tam ekran akış.
  */
 export default function FavoritesScreen() {
   const dispatch = useAppDispatch();
@@ -41,6 +46,9 @@ export default function FavoritesScreen() {
   const [activeTab, setActiveTab] = useState<FavoritesTab>("favoriler");
   const [activeFilter, setActiveFilter] = useState<FavoritesFilter>("tumu");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const term = searchQuery.trim().toLowerCase();
   const showSavedMeals = activeFilter === "tumu" || activeFilter === "kaydedilenler";
@@ -52,7 +60,8 @@ export default function FavoritesScreen() {
     .filter((recipe) => !term || recipe.title.toLowerCase().includes(term));
   const savedMeals = Object.values(mealFavorites)
     .sort((a, b) => b.savedAt - a.savedAt)
-    .filter((meal) => !term || meal.name.toLowerCase().includes(term));
+    .filter((meal) => !term || meal.name.toLowerCase().includes(term))
+    .filter((meal) => selectedCategories.length === 0 || selectedCategories.includes(meal.category));
   const favoriteChats = history
     .filter((entry) => entry.isFavorite)
     .filter((entry) => !term || historyEntryTitle(entry).toLowerCase().includes(term));
@@ -81,38 +90,64 @@ export default function FavoritesScreen() {
         </View>
 
         {activeTab === "favoriler" && (
-          <View className="flex-row items-center gap-2">
-            <View className="flex-row items-center gap-1.5 rounded-full border border-surface-border bg-surface-card px-3 py-2" style={{ width: 130 }}>
-              <Search size={14} color={Colors.surfaceTextMuted} />
-              <TextInput
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Ara"
-                placeholderTextColor={Colors.surfaceTextMuted}
-                className="flex-1 text-xs text-foreground"
-              />
+          <>
+            <View className="flex-row items-center gap-2">
+              <View
+                style={{ height: CHIP_HEIGHT }}
+                className="flex-row items-center gap-1.5 rounded-full border border-surface-border bg-surface-card px-3"
+              >
+                <Search size={14} color={Colors.brandOrange} />
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Ara"
+                  placeholderTextColor={Colors.surfaceTextMuted}
+                  style={{ width: 60 }}
+                  className="text-xs text-foreground"
+                />
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2">
+                {FILTERS.map((filter) => {
+                  const active = activeFilter === filter.key;
+                  const Icon = filter.icon;
+                  return (
+                    <Pressable
+                      key={filter.key}
+                      onPress={() => setActiveFilter(filter.key)}
+                      style={{
+                        height: CHIP_HEIGHT,
+                        borderWidth: 1,
+                        borderColor: active ? Colors.brandOrange : Colors.surfaceBorder,
+                      }}
+                      className={`flex-row items-center gap-1.5 rounded-full px-3 ${active ? "bg-brand-orange" : "bg-surface-card"}`}
+                    >
+                      <Icon size={13} color={active ? "#ffffff" : Colors.brandOrange} />
+                      <Text className={`text-xs font-medium ${active ? "text-white" : "text-surface-text-muted"}`}>{filter.label}</Text>
+                    </Pressable>
+                  );
+                })}
+                <Pressable
+                  onPress={() => setIsCategoryModalOpen(true)}
+                  style={{
+                    height: CHIP_HEIGHT,
+                    borderWidth: 1,
+                    borderColor: selectedCategories.length > 0 ? Colors.brandOrange : Colors.surfaceBorder,
+                  }}
+                  className={`flex-row items-center gap-1.5 rounded-full px-3 ${selectedCategories.length > 0 ? "bg-brand-orange" : "bg-surface-card"}`}
+                >
+                  <ListFilter size={13} color={selectedCategories.length > 0 ? "#ffffff" : Colors.brandOrange} />
+                  <Text className={`text-xs font-medium ${selectedCategories.length > 0 ? "text-white" : "text-surface-text-muted"}`}>
+                    Kategori{selectedCategories.length > 0 ? ` (${selectedCategories.length})` : ""}
+                  </Text>
+                </Pressable>
+              </ScrollView>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2">
-              {FILTERS.map((filter) => {
-                const active = activeFilter === filter.key;
-                const Icon = filter.icon;
-                return (
-                  <Pressable
-                    key={filter.key}
-                    onPress={() => setActiveFilter(filter.key)}
-                    style={{
-                      borderWidth: 1,
-                      borderColor: active ? Colors.brandOrange : Colors.surfaceBorder,
-                    }}
-                    className={`flex-row items-center gap-1.5 rounded-full px-3 py-2 ${active ? "bg-brand-orange" : "bg-surface-card"}`}
-                  >
-                    <Icon size={13} color={active ? "#ffffff" : Colors.surfaceTextMuted} />
-                    <Text className={`text-xs font-medium ${active ? "text-white" : "text-surface-text-muted"}`}>{filter.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
+
+            <Pressable onPress={() => setIsEditModalOpen(true)} className="flex-row items-center justify-end gap-1.5">
+              <Pencil size={13} color={Colors.brandOrange} />
+              <Text className="text-xs font-semibold text-brand-orange">Favorilerini düzenle</Text>
+            </Pressable>
+          </>
         )}
       </View>
 
@@ -212,6 +247,14 @@ export default function FavoritesScreen() {
           )}
         </ScrollView>
       )}
+
+      <CategoryFilterModal
+        visible={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        selected={selectedCategories}
+        onApply={setSelectedCategories}
+      />
+      <EditFavoritesModal visible={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} />
     </SafeAreaView>
   );
 }
