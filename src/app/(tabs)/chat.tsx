@@ -30,6 +30,7 @@ import PersonCountSelector from "@/components/PersonCountSelector";
 import RecipeModeSelector from "@/components/RecipeModeSelector";
 import RecipeMessageCard from "@/components/RecipeMessageCard";
 import ChatMessageActions from "@/components/ChatMessageActions";
+import MessageActionMenu from "@/components/MessageActionMenu";
 import ChatSidebarDrawer, { DRAWER_WIDTH } from "@/components/ChatSidebarDrawer";
 import BlurIconButton from "@/components/BlurIconButton";
 import ChatOptionsMenu from "@/components/ChatOptionsMenu";
@@ -123,6 +124,13 @@ export default function ChatScreen() {
   const [findQuery, setFindQuery] = useState("");
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesScrollRef = useRef<ScrollView>(null);
+  // Kullanıcı mesaj balonuna uzun basınca açılan Kopyala/Paylaş menüsü
+  // (bkz. MessageActionMenu) — anchor, dokunulan ekran noktası.
+  const [longPressMenu, setLongPressMenu] = useState<{ visible: boolean; anchor: { x: number; y: number } | null; text: string }>({
+    visible: false,
+    anchor: null,
+    text: "",
+  });
   // Şu an ekranda görünen sohbetin historySlice'taki kaydı — yeni bir tarif
   // üretildiğinde (handleSubmit) ya da çekmeceden bir kayıt seçildiğinde
   // (handleSelectEntry) buraya yazılır; "..." menüsündeki Pinle/Sil bu id'yi
@@ -421,9 +429,19 @@ export default function ChatScreen() {
           >
             {visibleMessages.map((message) =>
               message.role === "user" ? (
-                <View key={message.id} className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-orange px-4 py-2.5">
+                <Pressable
+                  key={message.id}
+                  onLongPress={(event) =>
+                    setLongPressMenu({
+                      visible: true,
+                      anchor: { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY },
+                      text: message.text ?? "",
+                    })
+                  }
+                  className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-orange px-4 py-2.5"
+                >
                   <Text className="text-sm text-white">{message.text}</Text>
-                </View>
+                </Pressable>
               ) : (
                 <View key={message.id} className="gap-3">
                   {message.text && (
@@ -432,9 +450,10 @@ export default function ChatScreen() {
                     </View>
                   )}
                   {message.recipes?.map((recipe, index) => <RecipeMessageCard key={index} recipe={recipe} />)}
-                  {message.recipes && message.recipes.length > 0 && (
+                  {(message.text || (message.recipes && message.recipes.length > 0)) && (
                     <ChatMessageActions
                       recipes={message.recipes}
+                      text={message.text}
                       createdAt={message.createdAt}
                       onBranch={() => handleBranchFrom(message.id)}
                     />
@@ -523,6 +542,12 @@ export default function ChatScreen() {
         onClose={() => setIsAttachOpen(false)}
         onPickCamera={() => pickPhotoFrom("camera", "followUp")}
         onPickLibrary={() => pickPhotoFrom("library", "followUp")}
+      />
+      <MessageActionMenu
+        visible={longPressMenu.visible}
+        anchor={longPressMenu.anchor}
+        text={longPressMenu.text}
+        onClose={() => setLongPressMenu((state) => ({ ...state, visible: false }))}
       />
     </SafeAreaView>
   ) : (
