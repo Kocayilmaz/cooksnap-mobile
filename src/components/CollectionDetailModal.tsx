@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Modal, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { ArrowLeft, Check, ChefHat, MessageCircle, Plus, Search, X } from "lucide-react-native";
+import { ArrowLeft, Check, ChefHat, MessageCircle, Plus, Search, Share2, X } from "lucide-react-native";
 import { useAppDispatch } from "@/lib/redux/hooks";
 import { addItemToCollection, removeItemFromCollection, type Collection } from "@/lib/redux/collectionsSlice";
 import { useFavoriteTiles } from "@/hooks/useFavoriteTiles";
@@ -13,28 +13,47 @@ interface CollectionDetailModalProps {
   visible: boolean;
   onClose: () => void;
   collection: Collection | null;
+  /** Açılır açılmaz "Ürün Ekle" seçicisini de göster — koleksiyon kartının
+   * "..." menüsündeki "Ürün Ekle" seçeneğinden (bkz. favorites.tsx). */
+  autoOpenPicker?: boolean;
 }
 
 /** Bir koleksiyonun içeriğini gösteren tam ekran — arama, ızgara halinde
- * öğeler ve "Ürün Ekle" ile favorilerden bu koleksiyona henüz eklenmemiş
- * öğeleri seçme (bkz. favorites.tsx'teki Koleksiyonlar sekmesi). */
-export default function CollectionDetailModal({ visible, onClose, collection }: CollectionDetailModalProps) {
+ * öğeler, paylaşma ve "Ürün Ekle" ile favorilerden bu koleksiyona henüz
+ * eklenmemiş öğeleri seçme (bkz. favorites.tsx'teki Koleksiyonlar sekmesi).
+ * Öğeler koleksiyonun kendi anlık görüntüsünden (collection.items) okunuyor
+ * — favorilerden silinmiş olsalar bile burada görünmeye devam ediyor. */
+export default function CollectionDetailModal({ visible, onClose, collection, autoOpenPicker }: CollectionDetailModalProps) {
   const dispatch = useAppDispatch();
   const router = useRouter();
-  const allTiles = useFavoriteTiles();
+  const allFavoriteTiles = useFavoriteTiles();
   const [search, setSearch] = useState("");
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
 
+  useEffect(() => {
+    if (visible) setIsPickerOpen(Boolean(autoOpenPicker));
+  }, [visible, autoOpenPicker]);
+
   if (!collection) return null;
 
-  const itemTiles = allTiles.filter((tile) => collection.itemKeys.includes(tile.key));
   const term = search.trim().toLowerCase();
-  const visibleTiles = term ? itemTiles.filter((tile) => tile.title.toLowerCase().includes(term)) : itemTiles;
+  const visibleItems = term ? collection.items.filter((item) => item.title.toLowerCase().includes(term)) : collection.items;
 
-  const availableTiles = allTiles.filter((tile) => !collection.itemKeys.includes(tile.key));
+  const existingKeys = new Set(collection.items.map((item) => item.key));
+  const availableTiles = allFavoriteTiles.filter((tile) => !existingKeys.has(tile.key));
   const pickerTerm = pickerSearch.trim().toLowerCase();
   const visiblePickerTiles = pickerTerm ? availableTiles.filter((tile) => tile.title.toLowerCase().includes(pickerTerm)) : availableTiles;
+
+  async function handleShare() {
+    if (!collection) return;
+    const titles = collection.items.map((item) => item.title).join(", ");
+    try {
+      await Share.share({ message: titles ? `${collection.name}: ${titles}` : `${collection.name} koleksiyonumu paylaşıyorum.` });
+    } catch {
+      // kullanıcı paylaşım sayfasını kapattıysa best-effort, hata göstermeye gerek yok.
+    }
+  }
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -46,10 +65,15 @@ export default function CollectionDetailModal({ visible, onClose, collection }: 
           <Text className="flex-1 px-2 text-base font-bold text-foreground" numberOfLines={1}>
             {collection.name}
           </Text>
-          <Pressable onPress={() => setIsPickerOpen(true)} className="flex-row items-center gap-1 rounded-full bg-brand-orange px-3 py-1.5">
-            <Plus size={14} color="#ffffff" />
-            <Text className="text-xs font-semibold text-white">Ürün Ekle</Text>
-          </Pressable>
+          <View className="flex-row items-center gap-3">
+            <Pressable onPress={handleShare} hitSlop={8}>
+              <Share2 size={18} color={Colors.surfaceTextMuted} />
+            </Pressable>
+            <Pressable onPress={() => setIsPickerOpen(true)} className="flex-row items-center gap-1 rounded-full bg-brand-orange px-3 py-1.5">
+              <Plus size={14} color="#ffffff" />
+              <Text className="text-xs font-semibold text-white">Ürün Ekle</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View className="px-4 pt-3">
@@ -58,7 +82,7 @@ export default function CollectionDetailModal({ visible, onClose, collection }: 
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder={`Koleksiyonda ara (${itemTiles.length} Ürün)`}
+              placeholder={`Koleksiyonda ara (${collection.items.length} Ürün)`}
               placeholderTextColor={Colors.surfaceTextMuted}
               className="flex-1 text-sm text-foreground"
             />
@@ -66,18 +90,18 @@ export default function CollectionDetailModal({ visible, onClose, collection }: 
         </View>
 
         <ScrollView contentContainerClassName="gap-3 p-4 pb-10">
-          {visibleTiles.length === 0 ? (
+          {visibleItems.length === 0 ? (
             <Text className="mt-10 text-center text-sm text-surface-text-muted">
-              {itemTiles.length === 0 ? "Bu koleksiyon henüz boş — Ürün Ekle ile başla." : "Eşleşen bir ürün bulunamadı."}
+              {collection.items.length === 0 ? "Bu koleksiyon henüz boş — Ürün Ekle ile başla." : "Eşleşen bir ürün bulunamadı."}
             </Text>
           ) : (
             <View className="flex-row flex-wrap gap-3">
-              {visibleTiles.map((tile) => (
+              {visibleItems.map((item) => (
                 <Pressable
-                  key={tile.key}
+                  key={item.key}
                   onPress={() => {
-                    if (tile.kind === "meal") {
-                      const mealId = tile.key.replace("meal:", "");
+                    if (item.kind === "meal") {
+                      const mealId = item.key.replace("meal:", "");
                       onClose();
                       router.push({ pathname: "/meal/[id]", params: { id: mealId } });
                     }
@@ -86,11 +110,11 @@ export default function CollectionDetailModal({ visible, onClose, collection }: 
                   className="gap-1"
                 >
                   <View style={{ aspectRatio: 1, borderRadius: 12, overflow: "hidden" }} className="bg-surface-card">
-                    {tile.thumbnail ? (
-                      <Image source={{ uri: tile.thumbnail }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+                    {item.thumbnail ? (
+                      <Image source={{ uri: item.thumbnail }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
                     ) : (
                       <View style={{ flex: 1 }} className="items-center justify-center">
-                        {tile.kind === "chat" ? (
+                        {item.kind === "chat" ? (
                           <MessageCircle size={26} color={Colors.surfaceTextMuted} />
                         ) : (
                           <ChefHat size={26} color={Colors.surfaceTextMuted} />
@@ -98,7 +122,7 @@ export default function CollectionDetailModal({ visible, onClose, collection }: 
                       </View>
                     )}
                     <Pressable
-                      onPress={() => dispatch(removeItemFromCollection({ collectionId: collection.id, itemKey: tile.key }))}
+                      onPress={() => dispatch(removeItemFromCollection({ collectionId: collection.id, itemKey: item.key }))}
                       hitSlop={8}
                       style={{
                         position: "absolute",
@@ -115,11 +139,11 @@ export default function CollectionDetailModal({ visible, onClose, collection }: 
                     </Pressable>
                   </View>
                   <Text numberOfLines={2} className="text-xs font-medium text-foreground">
-                    {tile.title}
+                    {item.title}
                   </Text>
-                  {tile.subtitle && (
+                  {item.subtitle && (
                     <Text numberOfLines={1} className="text-xs text-surface-text-muted">
-                      {tile.subtitle}
+                      {item.subtitle}
                     </Text>
                   )}
                 </Pressable>
@@ -155,7 +179,14 @@ export default function CollectionDetailModal({ visible, onClose, collection }: 
               visiblePickerTiles.map((tile) => (
                 <Pressable
                   key={tile.key}
-                  onPress={() => dispatch(addItemToCollection({ collectionId: collection.id, itemKey: tile.key }))}
+                  onPress={() =>
+                    dispatch(
+                      addItemToCollection({
+                        collectionId: collection.id,
+                        item: { key: tile.key, kind: tile.kind, title: tile.title, subtitle: tile.subtitle, thumbnail: tile.thumbnail },
+                      }),
+                    )
+                  }
                   className="flex-row items-center gap-3 py-2.5"
                 >
                   <View style={{ height: 40, width: 40, borderRadius: 8, overflow: "hidden" }} className="bg-surface-card">
