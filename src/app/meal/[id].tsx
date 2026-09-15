@@ -7,7 +7,7 @@ import { ArrowLeft, Heart, PlayCircle, Share2 } from "lucide-react-native";
 import { getMealDetail } from "@/lib/api/client";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { toggleMealFavorite } from "@/lib/redux/mealFavoritesSlice";
-import { notify } from "@/lib/notify";
+import AddToCollectionSheet from "@/components/AddToCollectionSheet";
 import { Colors } from "@/constants/theme";
 import type { MealDetail } from "@/lib/types/meal";
 
@@ -25,6 +25,7 @@ export default function MealDetailScreen() {
   const isFavorited = useAppSelector((state) => Boolean(state.mealFavorites[id]));
   const [meal, setMeal] = useState<MealDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isAddToCollectionOpen, setIsAddToCollectionOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -65,7 +66,13 @@ export default function MealDetailScreen() {
               </Pressable>
               <Pressable
                 onPress={() => dispatch(toggleMealFavorite(meal))}
-                onLongPress={() => notify("Koleksiyonlar yakında")}
+                onLongPress={() => {
+                  // Koleksiyona eklenen bir tarif useFavoriteTiles üzerinden
+                  // çözülüyor, o da yalnızca favorilenmiş öğeleri görüyor —
+                  // bu yüzden koleksiyona eklemeden önce favorilemesi gerekiyor.
+                  if (!isFavorited) dispatch(toggleMealFavorite(meal));
+                  setIsAddToCollectionOpen(true);
+                }}
                 hitSlop={8}
               >
                 <Heart size={20} color={Colors.brandOrange} fill={isFavorited ? Colors.brandOrange : "none"} />
@@ -124,6 +131,14 @@ export default function MealDetailScreen() {
           </>
         )}
       </ScrollView>
+
+      {meal && (
+        <AddToCollectionSheet
+          visible={isAddToCollectionOpen}
+          onClose={() => setIsAddToCollectionOpen(false)}
+          items={[{ key: `meal:${meal.id}`, removeFromFavorites: () => dispatch(toggleMealFavorite(meal)) }]}
+        />
+      )}
     </SafeAreaView>
   );
 }
