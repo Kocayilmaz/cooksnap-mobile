@@ -6,7 +6,6 @@ import { useRouter } from "expo-router";
 import {
   ChefHat,
   Clock,
-  FolderHeart,
   FolderPlus,
   Heart,
   LayoutGrid,
@@ -19,16 +18,19 @@ import {
   Wrench,
 } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
-import { toggleFavorite } from "@/lib/redux/favoritesSlice";
+import { toggleFavorite, type FavoriteRecipe } from "@/lib/redux/favoritesSlice";
 import { toggleMealFavorite } from "@/lib/redux/mealFavoritesSlice";
 import { EQUIPMENT_KEYS, EQUIPMENT_LABELS } from "@/lib/redux/equipmentSlice";
-import { historyEntryTitle, summarizeHistoryEntry, toggleHistoryFavorite } from "@/lib/redux/historySlice";
+import { historyEntryTitle, summarizeHistoryEntry, toggleHistoryFavorite, type HistoryEntry } from "@/lib/redux/historySlice";
 import { createCollection, deleteCollection, renameCollection, type Collection } from "@/lib/redux/collectionsSlice";
 import { getCategoryLabel } from "@/lib/mealdb/categoryMeta";
 import { getAreaLabel } from "@/lib/mealdb/areaMeta";
+import type { MealFavorite } from "@/lib/redux/mealFavoritesSlice";
+import AddToCollectionSheet from "@/components/AddToCollectionSheet";
 import CategoryFilterModal from "@/components/CategoryFilterModal";
 import ChecklistFilterModal from "@/components/ChecklistFilterModal";
 import CollectionDetailModal from "@/components/CollectionDetailModal";
+import CollectionOptionsSheet from "@/components/CollectionOptionsSheet";
 import CreateCollectionModal from "@/components/CreateCollectionModal";
 import EditFavoritesModal from "@/components/EditFavoritesModal";
 import { Colors } from "@/constants/theme";
@@ -45,15 +47,20 @@ const FILTERS: { key: FavoritesFilter; label: string; icon: typeof LayoutGrid }[
 
 const CHIP_HEIGHT = 40;
 
+function makeCollectionId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 /**
  * ne-pisirsem'deki app/favorites/page.tsx'in mobil karşılığı — aynı ayrım:
  * "Kaydedilen Tarifler" (anasayfadaki hazır MealDB tariflerinde kalp ile
  * favorilenenler, bkz. MealCard.tsx), "Sohbet Favorileri" (sabitlenen
  * konuşmalar) ve en altta "Tarif Favorileri" (chat'te üretilen, yıldızlanan
- * tarifler) ayrı bölümler. Üstte "Favoriler"/"Koleksiyonlar" sekmeleri var —
- * Koleksiyonlar şimdilik yer tutucu, kullanıcı tanımlı koleksiyon özelliği
- * henüz veri modelinde yok. "Favorilerini düzenle" (bkz. EditFavoritesModal)
- * toplu seçip silme/koleksiyona ekleme için ayrı bir tam ekran akış.
+ * tarifler) ayrı bölümler. Üstte "Favoriler"/"Koleksiyonlar" sekmeleri var.
+ * Her favori satırına uzun basınca (bkz. AddToCollectionSheet) doğrudan o
+ * öğeyi bir koleksiyona ekleme açılıyor. "Favorilerini düzenle" (bkz.
+ * EditFavoritesModal) toplu seçip silme/koleksiyona ekleme için ayrı bir
+ * tam ekran akış.
  */
 export default function FavoritesScreen() {
   const dispatch = useAppDispatch();
@@ -61,6 +68,7 @@ export default function FavoritesScreen() {
   const favorites = useAppSelector((state) => state.favorites);
   const mealFavorites = useAppSelector((state) => state.mealFavorites);
   const history = useAppSelector((state) => state.history);
+  const collections = useAppSelector((state) => state.collections);
   const [activeTab, setActiveTab] = useState<FavoritesTab>("favoriler");
   const [activeFilter, setActiveFilter] = useState<FavoritesFilter>("tumu");
   const [searchQuery, setSearchQuery] = useState("");
@@ -69,37 +77,58 @@ export default function FavoritesScreen() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const collections = useAppSelector((state) => state.collections);
-  const [collectionsSubTab, setCollectionsSubTab] = useState<"koleksiyonlarim" | "kaydettiklerim">("koleksiyonlarim");
   const [isCreateCollectionOpen, setIsCreateCollectionOpen] = useState(false);
   const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
+  const [autoOpenPicker, setAutoOpenPicker] = useState(false);
   const [renamingCollection, setRenamingCollection] = useState<Collection | null>(null);
+  const [optionsCollection, setOptionsCollection] = useState<Collection | null>(null);
+  const [singleAddItem, setSingleAddItem] = useState<{
+    key: string;
+    kind: "meal" | "recipe" | "chat";
+    title: string;
+    subtitle: string;
+    thumbnail: string | null;
+    removeFromFavorites: () => void;
+  } | null>(null);
 
   const collectionList = Object.values(collections).sort((a, b) => b.createdAt - a.createdAt);
   const openCollection: Collection | null = openCollectionId ? collections[openCollectionId] ?? null : null;
-
-  function makeCollectionId(): string {
-    return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  }
 
   function handleCreateCollection(name: string) {
     dispatch(createCollection({ id: makeCollectionId(), name }));
   }
 
-  function handleCollectionMenu(collection: Collection) {
-    Alert.alert(collection.name, undefined, [
-      { text: "Vazgeç", style: "cancel" },
-      { text: "Yeniden Adlandır", onPress: () => setRenamingCollection(collection) },
-      {
-        text: "Sil",
-        style: "destructive",
-        onPress: () =>
-          Alert.alert("Koleksiyonu sil", `"${collection.name}" koleksiyonunu silmek istediğine emin misin?`, [
-            { text: "Vazgeç", style: "cancel" },
-            { text: "Sil", style: "destructive", onPress: () => dispatch(deleteCollection(collection.id)) },
-          ]),
-      },
-    ]);
+  function openMealCollectionSheet(meal: MealFavorite) {
+    setSingleAddItem({
+      key: `meal:${meal.id}`,
+      kind: "meal",
+      title: meal.name,
+      subtitle: meal.category ? getCategoryLabel(meal.category) : "",
+      thumbnail: meal.thumbnail,
+      removeFromFavorites: () => dispatch(toggleMealFavorite(meal)),
+    });
+  }
+
+  function openRecipeCollectionSheet(recipe: FavoriteRecipe) {
+    setSingleAddItem({
+      key: `recipe:${recipe.id}`,
+      kind: "recipe",
+      title: recipe.title,
+      subtitle: EQUIPMENT_LABELS[recipe.equipment],
+      thumbnail: null,
+      removeFromFavorites: () => dispatch(toggleFavorite(recipe)),
+    });
+  }
+
+  function openChatCollectionSheet(entry: HistoryEntry) {
+    setSingleAddItem({
+      key: `chat:${entry.id}`,
+      kind: "chat",
+      title: historyEntryTitle(entry),
+      subtitle: summarizeHistoryEntry(entry),
+      thumbnail: null,
+      removeFromFavorites: () => dispatch(toggleHistoryFavorite(entry.id)),
+    });
   }
 
   const term = searchQuery.trim().toLowerCase();
@@ -221,73 +250,47 @@ export default function FavoritesScreen() {
 
       {activeTab === "koleksiyonlar" ? (
         <View style={{ flex: 1 }} className="gap-4 px-4 pt-4">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row gap-4">
-              {(
-                [
-                  { key: "koleksiyonlarim", label: `Koleksiyonlarım (${collectionList.length})` },
-                  { key: "kaydettiklerim", label: "Kaydettiklerim (0)" },
-                ] as const
-              ).map((tab) => {
-                const active = collectionsSubTab === tab.key;
-                return (
-                  <Pressable key={tab.key} onPress={() => setCollectionsSubTab(tab.key)}>
-                    <Text className={`text-sm font-semibold ${active ? "text-brand-orange" : "text-surface-text-muted"}`}>
-                      {tab.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Pressable
-              onPress={() => setIsCreateCollectionOpen(true)}
-              className="flex-row items-center gap-1 rounded-full bg-brand-orange px-3 py-1.5"
-            >
-              <FolderPlus size={14} color="#ffffff" />
-              <Text className="text-xs font-semibold text-white">Yeni</Text>
-            </Pressable>
-          </View>
+          <Text className="text-sm font-semibold text-brand-orange">Koleksiyonlarım ({collectionList.length})</Text>
 
-          {collectionsSubTab === "kaydettiklerim" ? (
-            <View style={{ flex: 1 }} className="items-center justify-center gap-3 px-8">
-              <FolderHeart size={40} color={Colors.surfaceTextMuted} />
-              <Text className="text-center text-sm font-semibold text-foreground">Henüz kaydedilen koleksiyon yok</Text>
-              <Text className="text-center text-sm text-surface-text-muted">
-                Başkalarının paylaştığı koleksiyonları buraya kaydedebileceksin.
-              </Text>
-            </View>
-          ) : collectionList.length === 0 ? (
+          {collectionList.length === 0 ? (
             <View style={{ flex: 1 }} className="items-center justify-center gap-3 px-8">
               <FolderPlus size={40} color={Colors.surfaceTextMuted} />
               <Text className="text-center text-sm font-semibold text-foreground">Henüz koleksiyon oluşturmadın</Text>
               <Text className="text-center text-sm text-surface-text-muted">
                 Favorilerini gruplamak için bir koleksiyon oluştur.
               </Text>
-              <Pressable onPress={() => setIsCreateCollectionOpen(true)} className="rounded-full bg-brand-orange px-5 py-2.5">
-                <Text className="text-sm font-semibold text-white">Koleksiyon Oluştur</Text>
-              </Pressable>
             </View>
           ) : (
-            <ScrollView contentContainerClassName="gap-3 pb-10">
+            <ScrollView contentContainerClassName="gap-3 pb-4">
               <View className="flex-row flex-wrap gap-3">
                 {collectionList.map((collection) => (
                   <Pressable
                     key={collection.id}
-                    onPress={() => setOpenCollectionId(collection.id)}
+                    onPress={() => {
+                      setAutoOpenPicker(false);
+                      setOpenCollectionId(collection.id);
+                    }}
                     style={{ width: "47%" }}
                     className="gap-2 rounded-2xl bg-surface-card p-3 shadow-sm"
                   >
-                    <View style={{ aspectRatio: 1.4, borderRadius: 12, overflow: "hidden" }} className="items-center justify-center bg-surface-warm">
-                      <FolderHeart size={30} color={Colors.brandOrange} />
+                    <View
+                      style={{ aspectRatio: 1.4, borderRadius: 12, overflow: "hidden" }}
+                      className="items-center justify-center bg-surface-warm"
+                    >
+                      {collection.items[0]?.thumbnail ? (
+                        <Image source={{ uri: collection.items[0].thumbnail }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+                      ) : (
+                        <FolderPlus size={30} color={Colors.brandOrange} />
+                      )}
                     </View>
                     <View className="flex-row items-start justify-between gap-1">
                       <View className="flex-1 gap-0.5">
                         <Text numberOfLines={1} className="text-sm font-semibold text-foreground">
                           {collection.name}
                         </Text>
-                        <Text className="text-xs text-surface-text-muted">{collection.itemKeys.length} Ürün</Text>
+                        <Text className="text-xs text-surface-text-muted">{collection.items.length} Ürün</Text>
                       </View>
-                      <Pressable onPress={() => handleCollectionMenu(collection)} hitSlop={8}>
+                      <Pressable onPress={() => setOptionsCollection(collection)} hitSlop={8}>
                         <MoreVertical size={16} color={Colors.surfaceTextMuted} />
                       </Pressable>
                     </View>
@@ -296,6 +299,15 @@ export default function FavoritesScreen() {
               </View>
             </ScrollView>
           )}
+
+          <Pressable
+            onPress={() => setIsCreateCollectionOpen(true)}
+            style={{ marginBottom: 12 }}
+            className="flex-row items-center justify-center gap-2 self-center rounded-full bg-brand-orange px-6 py-3"
+          >
+            <FolderPlus size={16} color="#ffffff" />
+            <Text className="text-sm font-semibold text-white">Yeni Koleksiyon</Text>
+          </Pressable>
         </View>
       ) : (
         <ScrollView contentContainerClassName="gap-6 p-4 pb-10">
@@ -312,6 +324,7 @@ export default function FavoritesScreen() {
                   <Pressable
                     key={meal.id}
                     onPress={() => router.push({ pathname: "/meal/[id]", params: { id: meal.id } })}
+                    onLongPress={() => openMealCollectionSheet(meal)}
                     className="flex-row items-center gap-3 rounded-xl border border-surface-border p-3"
                   >
                     <Image source={{ uri: meal.thumbnail }} style={{ height: 48, width: 48, borderRadius: 10 }} contentFit="cover" />
@@ -343,7 +356,11 @@ export default function FavoritesScreen() {
               </Text>
               <View className="gap-2">
                 {favoriteChats.map((entry) => (
-                  <View key={entry.id} className="flex-row items-center justify-between gap-2 rounded-xl border border-surface-border p-3">
+                  <Pressable
+                    key={entry.id}
+                    onLongPress={() => openChatCollectionSheet(entry)}
+                    className="flex-row items-center justify-between gap-2 rounded-xl border border-surface-border p-3"
+                  >
                     <View className="flex-1 gap-0.5">
                       <Text className="text-sm font-semibold text-foreground">{historyEntryTitle(entry)}</Text>
                       <Text className="text-xs text-surface-text-muted">{summarizeHistoryEntry(entry)}</Text>
@@ -351,7 +368,7 @@ export default function FavoritesScreen() {
                     <Pressable onPress={() => dispatch(toggleHistoryFavorite(entry.id))} hitSlop={8}>
                       <Star size={18} color={Colors.brandOrange} fill={Colors.brandOrange} />
                     </Pressable>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             </View>
@@ -367,7 +384,11 @@ export default function FavoritesScreen() {
             ) : (
               <View className="gap-3">
                 {allRecipes.map((recipe) => (
-                  <View key={recipe.id} className="rounded-xl border border-surface-border p-3">
+                  <Pressable
+                    key={recipe.id}
+                    onLongPress={() => openRecipeCollectionSheet(recipe)}
+                    className="rounded-xl border border-surface-border p-3"
+                  >
                     <View className="flex-row items-start justify-between gap-2">
                       <View className="flex-1 gap-0.5">
                         <Text className="text-sm font-semibold text-foreground">{recipe.title}</Text>
@@ -377,7 +398,7 @@ export default function FavoritesScreen() {
                         <Star size={18} color={Colors.brandOrange} fill={Colors.brandOrange} />
                       </Pressable>
                     </View>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             )}
@@ -401,7 +422,14 @@ export default function FavoritesScreen() {
         selected={selectedEquipment}
         onApply={setSelectedEquipment}
       />
-      <EditFavoritesModal visible={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} />
+      <EditFavoritesModal
+        visible={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onCollectionDone={(collectionId) => {
+          setAutoOpenPicker(false);
+          setOpenCollectionId(collectionId);
+        }}
+      />
       <CreateCollectionModal
         visible={isCreateCollectionOpen}
         onClose={() => setIsCreateCollectionOpen(false)}
@@ -415,10 +443,42 @@ export default function FavoritesScreen() {
           if (renamingCollection) dispatch(renameCollection({ id: renamingCollection.id, name }));
         }}
       />
+      <CollectionOptionsSheet
+        visible={Boolean(optionsCollection)}
+        collection={optionsCollection}
+        onClose={() => setOptionsCollection(null)}
+        onAddItem={() => {
+          if (!optionsCollection) return;
+          setAutoOpenPicker(true);
+          setOpenCollectionId(optionsCollection.id);
+        }}
+        onRename={() => setRenamingCollection(optionsCollection)}
+        onDelete={() =>
+          optionsCollection &&
+          Alert.alert("Koleksiyonu sil", `"${optionsCollection.name}" koleksiyonunu silmek istediğine emin misin?`, [
+            { text: "Vazgeç", style: "cancel" },
+            { text: "Sil", style: "destructive", onPress: () => dispatch(deleteCollection(optionsCollection.id)) },
+          ])
+        }
+      />
       <CollectionDetailModal
         visible={Boolean(openCollection)}
         collection={openCollection}
-        onClose={() => setOpenCollectionId(null)}
+        autoOpenPicker={autoOpenPicker}
+        onClose={() => {
+          setOpenCollectionId(null);
+          setAutoOpenPicker(false);
+        }}
+      />
+      <AddToCollectionSheet
+        visible={Boolean(singleAddItem)}
+        onClose={() => setSingleAddItem(null)}
+        items={singleAddItem ? [singleAddItem] : []}
+        onDone={(collectionId) => {
+          setSingleAddItem(null);
+          setAutoOpenPicker(false);
+          setOpenCollectionId(collectionId);
+        }}
       />
     </SafeAreaView>
   );
