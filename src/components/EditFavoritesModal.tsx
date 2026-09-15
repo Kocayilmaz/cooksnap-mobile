@@ -1,14 +1,10 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
-import { Check, ChefHat, Search, X } from "lucide-react-native";
-import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
-import { toggleFavorite } from "@/lib/redux/favoritesSlice";
-import { toggleMealFavorite } from "@/lib/redux/mealFavoritesSlice";
-import { EQUIPMENT_LABELS } from "@/lib/redux/equipmentSlice";
-import { getCategoryLabel } from "@/lib/mealdb/categoryMeta";
-import { notify } from "@/lib/notify";
+import { Check, ChefHat, MessageCircle, Search, X } from "lucide-react-native";
+import { useFavoriteTiles } from "@/hooks/useFavoriteTiles";
+import AddToCollectionSheet from "@/components/AddToCollectionSheet";
 import { Colors } from "@/constants/theme";
 
 interface EditFavoritesModalProps {
@@ -16,40 +12,17 @@ interface EditFavoritesModalProps {
   onClose: () => void;
 }
 
-type FavoriteTile = { key: string; kind: "meal" | "recipe"; thumbnail: string | null; title: string; subtitle: string };
-
-/** "Favorilerini düzenle" ekranı — favorilenmiş tarifleri tek tek seçip
- * toplu silme (ya da ileride koleksiyona ekleme) yapmak için, alışveriş
+/** "Favorilerini düzenle" ekranı — favorilenmiş tarifleri/sohbetleri tek
+ * tek seçip toplu silme ya da koleksiyona ekleme yapmak için, alışveriş
  * uygulamalarındaki "Favorilerim" düzenleme ızgarasının karşılığı (bkz.
- * favorites.tsx'teki "Favorilerini düzenle" bağlantısı). */
+ * favorites.tsx'teki "Favorilerini düzenle" bağlantısı). Üç favori
+ * kaynağının (kaydedilen tarifler, tarif favorileri, sohbet favorileri)
+ * hepsini aynı ızgarada gösteriyor (bkz. useFavoriteTiles). */
 export default function EditFavoritesModal({ visible, onClose }: EditFavoritesModalProps) {
-  const dispatch = useAppDispatch();
-  const mealFavorites = useAppSelector((state) => state.mealFavorites);
-  const favorites = useAppSelector((state) => state.favorites);
+  const tiles = useFavoriteTiles();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-
-  const tiles = useMemo<FavoriteTile[]>(() => {
-    const meals: FavoriteTile[] = Object.values(mealFavorites)
-      .sort((a, b) => b.savedAt - a.savedAt)
-      .map((meal) => ({
-        key: `meal:${meal.id}`,
-        kind: "meal" as const,
-        thumbnail: meal.thumbnail,
-        title: meal.name,
-        subtitle: meal.category ? getCategoryLabel(meal.category) : "",
-      }));
-    const recipes: FavoriteTile[] = Object.values(favorites)
-      .sort((a, b) => b.savedAt - a.savedAt)
-      .map((recipe) => ({
-        key: `recipe:${recipe.id}`,
-        kind: "recipe" as const,
-        thumbnail: null,
-        title: recipe.title,
-        subtitle: EQUIPMENT_LABELS[recipe.equipment],
-      }));
-    return [...meals, ...recipes];
-  }, [mealFavorites, favorites]);
+  const [isAddToCollectionOpen, setIsAddToCollectionOpen] = useState(false);
 
   const term = search.trim().toLowerCase();
   const visibleTiles = term ? tiles.filter((tile) => tile.title.toLowerCase().includes(term)) : tiles;
@@ -63,35 +36,24 @@ export default function EditFavoritesModal({ visible, onClose }: EditFavoritesMo
     });
   }
 
-  function handleAddToCollection() {
-    if (selected.size === 0) return;
-    notify("Koleksiyonlar yakında");
-  }
-
   function handleDelete() {
     if (selected.size === 0) return;
-    Alert.alert("Favorilerden kaldır", `${selected.size} tarifi favorilerden kaldırmak istediğine emin misin?`, [
+    Alert.alert("Favorilerden kaldır", `${selected.size} öğeyi favorilerden kaldırmak istediğine emin misin?`, [
       { text: "Vazgeç", style: "cancel" },
       {
         text: "Sil",
         style: "destructive",
         onPress: () => {
           for (const key of selected) {
-            const tile = tiles.find((item) => item.key === key);
-            if (!tile) continue;
-            if (tile.kind === "meal") {
-              const meal = mealFavorites[key.replace("meal:", "")];
-              if (meal) dispatch(toggleMealFavorite(meal));
-            } else {
-              const recipe = favorites[key.replace("recipe:", "")];
-              if (recipe) dispatch(toggleFavorite(recipe));
-            }
+            tiles.find((tile) => tile.key === key)?.remove();
           }
           setSelected(new Set());
         },
       },
     ]);
   }
+
+  const selectedTiles = tiles.filter((tile) => selected.has(tile.key));
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -100,7 +62,7 @@ export default function EditFavoritesModal({ visible, onClose }: EditFavoritesMo
           <Pressable onPress={onClose} hitSlop={8}>
             <X size={22} color={Colors.foreground} />
           </Pressable>
-          <Text className="flex-1 text-base font-bold text-foreground">Favorilerim ({tiles.length} Tarif)</Text>
+          <Text className="flex-1 text-base font-bold text-foreground">Favorilerim ({tiles.length} Öğe)</Text>
         </View>
 
         <View className="px-4 pt-3">
@@ -109,7 +71,7 @@ export default function EditFavoritesModal({ visible, onClose }: EditFavoritesMo
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder="Tarif, kategori ara"
+              placeholder="Tarif, sohbet ara"
               placeholderTextColor={Colors.surfaceTextMuted}
               className="flex-1 text-sm text-foreground"
             />
@@ -130,7 +92,11 @@ export default function EditFavoritesModal({ visible, onClose }: EditFavoritesMo
                         <Image source={{ uri: tile.thumbnail }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
                       ) : (
                         <View style={{ flex: 1 }} className="items-center justify-center">
-                          <ChefHat size={26} color={Colors.surfaceTextMuted} />
+                          {tile.kind === "chat" ? (
+                            <MessageCircle size={26} color={Colors.surfaceTextMuted} />
+                          ) : (
+                            <ChefHat size={26} color={Colors.surfaceTextMuted} />
+                          )}
                         </View>
                       )}
                       <View
@@ -167,7 +133,8 @@ export default function EditFavoritesModal({ visible, onClose }: EditFavoritesMo
 
         <View style={{ borderTopWidth: 1, borderTopColor: Colors.surfaceBorder }} className="flex-row gap-3 p-4">
           <Pressable
-            onPress={handleAddToCollection}
+            onPress={() => setIsAddToCollectionOpen(true)}
+            disabled={selected.size === 0}
             style={{ opacity: selected.size === 0 ? 0.5 : 1 }}
             className="flex-1 items-center rounded-full border border-surface-border py-3"
           >
@@ -182,6 +149,15 @@ export default function EditFavoritesModal({ visible, onClose }: EditFavoritesMo
           </Pressable>
         </View>
       </SafeAreaView>
+
+      <AddToCollectionSheet
+        visible={isAddToCollectionOpen}
+        onClose={() => {
+          setIsAddToCollectionOpen(false);
+          setSelected(new Set());
+        }}
+        items={selectedTiles.map((tile) => ({ key: tile.key, removeFromFavorites: tile.remove }))}
+      />
     </Modal>
   );
 }
