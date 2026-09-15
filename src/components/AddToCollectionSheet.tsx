@@ -2,13 +2,12 @@ import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { Folder, FolderPlus, Plus, Trash2, X } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
-import { addItemToCollection, createCollection } from "@/lib/redux/collectionsSlice";
+import { addItemToCollection, createCollection, type CollectionItem } from "@/lib/redux/collectionsSlice";
 import CreateCollectionModal from "@/components/CreateCollectionModal";
 import { notify } from "@/lib/notify";
 import { Colors } from "@/constants/theme";
 
-interface AddToCollectionSheetItem {
-  key: string;
+interface AddToCollectionSheetItem extends CollectionItem {
   removeFromFavorites: () => void;
 }
 
@@ -16,6 +15,10 @@ interface AddToCollectionSheetProps {
   visible: boolean;
   onClose: () => void;
   items: AddToCollectionSheetItem[];
+  /** Öğe(ler) bir koleksiyona eklenip akış tamamlandığında çağrılır —
+   * hangi koleksiyona eklendiğini bildirir (bkz. favorites.tsx'in
+   * EditFavoritesModal'dan sonra o koleksiyonun ekranını açması). */
+  onDone?: (collectionId: string) => void;
 }
 
 type Step = "list" | "choice";
@@ -26,16 +29,19 @@ function makeCollectionId(): string {
 
 /**
  * "Koleksiyona Ekle" akışı — favori bir tarifin/sohbetin üstünde (bkz.
- * meal/[id].tsx, EditFavoritesModal) tetiklenir. Mevcut koleksiyonlardan
- * seç ya da yeni oluştur (list, bkz. CreateCollectionModal) → eklendikten
- * sonra favorilerden de silinsin mi diye sor (choice). Alışveriş
- * uygulamalarındaki "koleksiyona ekle" akışının karşılığı.
+ * meal/[id].tsx, EditFavoritesModal, favorites.tsx) tetiklenir. Mevcut
+ * koleksiyonlardan seç ya da yeni oluştur (list, bkz. CreateCollectionModal)
+ * → eklendikten sonra favorilerden de silinsin mi diye sor (choice).
+ * Öğeler koleksiyona kendi anlık görüntüsüyle (title/thumbnail/...)
+ * ekleniyor, sadece bir referans id değil — böylece "favorilerden sil"
+ * seçilse de koleksiyondan kaybolmuyor (bkz. collectionsSlice).
  */
-export default function AddToCollectionSheet({ visible, onClose, items }: AddToCollectionSheetProps) {
+export default function AddToCollectionSheet({ visible, onClose, items, onDone }: AddToCollectionSheetProps) {
   const dispatch = useAppDispatch();
   const collections = useAppSelector((state) => state.collections);
   const [step, setStep] = useState<Step>("list");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [targetCollectionId, setTargetCollectionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) setStep("list");
@@ -45,8 +51,14 @@ export default function AddToCollectionSheet({ visible, onClose, items }: AddToC
 
   function addItemsTo(collectionId: string) {
     for (const item of items) {
-      dispatch(addItemToCollection({ collectionId, itemKey: item.key }));
+      dispatch(
+        addItemToCollection({
+          collectionId,
+          item: { key: item.key, kind: item.kind, title: item.title, subtitle: item.subtitle, thumbnail: item.thumbnail },
+        }),
+      );
     }
+    setTargetCollectionId(collectionId);
     setStep("choice");
   }
 
@@ -56,15 +68,20 @@ export default function AddToCollectionSheet({ visible, onClose, items }: AddToC
     addItemsTo(id);
   }
 
+  function finish() {
+    if (targetCollectionId) onDone?.(targetCollectionId);
+    onClose();
+  }
+
   function handleKeepInFavorites() {
     notify("Koleksiyona eklendi");
-    onClose();
+    finish();
   }
 
   function handleRemoveFromFavorites() {
     for (const item of items) item.removeFromFavorites();
     notify("Koleksiyona eklendi ve favorilerden kaldırıldı");
-    onClose();
+    finish();
   }
 
   return (
@@ -96,7 +113,7 @@ export default function AddToCollectionSheet({ visible, onClose, items }: AddToC
                     <Folder size={20} color={Colors.surfaceTextMuted} />
                     <View className="flex-1 gap-0.5">
                       <Text className="text-sm font-medium text-foreground">{collection.name}</Text>
-                      <Text className="text-xs text-surface-text-muted">{collection.itemKeys.length} Ürün</Text>
+                      <Text className="text-xs text-surface-text-muted">{collection.items.length} Ürün</Text>
                     </View>
                   </Pressable>
                 ))}

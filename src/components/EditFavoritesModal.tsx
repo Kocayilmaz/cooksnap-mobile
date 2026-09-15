@@ -10,6 +10,9 @@ import { Colors } from "@/constants/theme";
 interface EditFavoritesModalProps {
   visible: boolean;
   onClose: () => void;
+  /** Bir koleksiyona ekleme akışı tamamlandığında çağrılır — bu ekran da
+   * kapanıp o koleksiyonun detay ekranı açılsın diye (bkz. favorites.tsx). */
+  onCollectionDone: (collectionId: string) => void;
 }
 
 /** "Favorilerini düzenle" ekranı — favorilenmiş tarifleri/sohbetleri tek
@@ -18,7 +21,7 @@ interface EditFavoritesModalProps {
  * favorites.tsx'teki "Favorilerini düzenle" bağlantısı). Üç favori
  * kaynağının (kaydedilen tarifler, tarif favorileri, sohbet favorileri)
  * hepsini aynı ızgarada gösteriyor (bkz. useFavoriteTiles). */
-export default function EditFavoritesModal({ visible, onClose }: EditFavoritesModalProps) {
+export default function EditFavoritesModal({ visible, onClose, onCollectionDone }: EditFavoritesModalProps) {
   const tiles = useFavoriteTiles();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -156,7 +159,19 @@ export default function EditFavoritesModal({ visible, onClose }: EditFavoritesMo
           setIsAddToCollectionOpen(false);
           setSelected(new Set());
         }}
-        items={selectedTiles.map((tile) => ({ key: tile.key, removeFromFavorites: tile.remove }))}
+        items={selectedTiles.map((tile) => ({
+          key: tile.key,
+          kind: tile.kind,
+          title: tile.title,
+          subtitle: tile.subtitle,
+          thumbnail: tile.thumbnail,
+          removeFromFavorites: tile.remove,
+        }))}
+        onDone={(collectionId) => {
+          setSelected(new Set());
+          onClose();
+          onCollectionDone(collectionId);
+        }}
       />
     </Modal>
   );

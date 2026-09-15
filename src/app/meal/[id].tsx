@@ -136,7 +136,16 @@ export default function MealDetailScreen() {
         <AddToCollectionSheet
           visible={isAddToCollectionOpen}
           onClose={() => setIsAddToCollectionOpen(false)}
-          items={[{ key: `meal:${meal.id}`, removeFromFavorites: () => dispatch(toggleMealFavorite(meal)) }]}
+          items={[
+            {
+              key: `meal:${meal.id}`,
+              kind: "meal",
+              title: meal.name,
+              subtitle: [meal.category, meal.area].filter(Boolean).join(" · "),
+              thumbnail: meal.thumbnail,
+              removeFromFavorites: () => dispatch(toggleMealFavorite(meal)),
+            },
+          ]}
         />
       )}
     </SafeAreaView>
