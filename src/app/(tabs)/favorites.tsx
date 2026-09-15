@@ -1,18 +1,35 @@
 import { useState } from "react";
-import { ScrollView, Text, TextInput, View, Pressable } from "react-native";
+import { Alert, ScrollView, Text, TextInput, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { ChefHat, Clock, FolderHeart, Heart, LayoutGrid, ListFilter, MessageCircle, Pencil, Search, Star, Wrench } from "lucide-react-native";
+import {
+  ChefHat,
+  Clock,
+  FolderHeart,
+  FolderPlus,
+  Heart,
+  LayoutGrid,
+  ListFilter,
+  MessageCircle,
+  MoreVertical,
+  Pencil,
+  Search,
+  Star,
+  Wrench,
+} from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { toggleFavorite } from "@/lib/redux/favoritesSlice";
 import { toggleMealFavorite } from "@/lib/redux/mealFavoritesSlice";
 import { EQUIPMENT_KEYS, EQUIPMENT_LABELS } from "@/lib/redux/equipmentSlice";
 import { historyEntryTitle, summarizeHistoryEntry, toggleHistoryFavorite } from "@/lib/redux/historySlice";
+import { createCollection, deleteCollection, renameCollection, type Collection } from "@/lib/redux/collectionsSlice";
 import { getCategoryLabel } from "@/lib/mealdb/categoryMeta";
 import { getAreaLabel } from "@/lib/mealdb/areaMeta";
 import CategoryFilterModal from "@/components/CategoryFilterModal";
 import ChecklistFilterModal from "@/components/ChecklistFilterModal";
+import CollectionDetailModal from "@/components/CollectionDetailModal";
+import CreateCollectionModal from "@/components/CreateCollectionModal";
 import EditFavoritesModal from "@/components/EditFavoritesModal";
 import { Colors } from "@/constants/theme";
 
@@ -52,6 +69,38 @@ export default function FavoritesScreen() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const collections = useAppSelector((state) => state.collections);
+  const [collectionsSubTab, setCollectionsSubTab] = useState<"koleksiyonlarim" | "kaydettiklerim">("koleksiyonlarim");
+  const [isCreateCollectionOpen, setIsCreateCollectionOpen] = useState(false);
+  const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
+  const [renamingCollection, setRenamingCollection] = useState<Collection | null>(null);
+
+  const collectionList = Object.values(collections).sort((a, b) => b.createdAt - a.createdAt);
+  const openCollection: Collection | null = openCollectionId ? collections[openCollectionId] ?? null : null;
+
+  function makeCollectionId(): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function handleCreateCollection(name: string) {
+    dispatch(createCollection({ id: makeCollectionId(), name }));
+  }
+
+  function handleCollectionMenu(collection: Collection) {
+    Alert.alert(collection.name, undefined, [
+      { text: "Vazgeç", style: "cancel" },
+      { text: "Yeniden Adlandır", onPress: () => setRenamingCollection(collection) },
+      {
+        text: "Sil",
+        style: "destructive",
+        onPress: () =>
+          Alert.alert("Koleksiyonu sil", `"${collection.name}" koleksiyonunu silmek istediğine emin misin?`, [
+            { text: "Vazgeç", style: "cancel" },
+            { text: "Sil", style: "destructive", onPress: () => dispatch(deleteCollection(collection.id)) },
+          ]),
+      },
+    ]);
+  }
 
   const term = searchQuery.trim().toLowerCase();
   const showSavedMeals = activeFilter === "tumu" || activeFilter === "kaydedilenler";
@@ -171,12 +220,82 @@ export default function FavoritesScreen() {
       </View>
 
       {activeTab === "koleksiyonlar" ? (
-        <View style={{ flex: 1 }} className="items-center justify-center gap-3 px-8">
-          <FolderHeart size={40} color={Colors.surfaceTextMuted} />
-          <Text className="text-center text-sm font-semibold text-foreground">Koleksiyonlar yakında</Text>
-          <Text className="text-center text-sm text-surface-text-muted">
-            Favorilerini kendi koleksiyonlarında gruplama özelliği üzerinde çalışıyoruz.
-          </Text>
+        <View style={{ flex: 1 }} className="gap-4 px-4 pt-4">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row gap-4">
+              {(
+                [
+                  { key: "koleksiyonlarim", label: `Koleksiyonlarım (${collectionList.length})` },
+                  { key: "kaydettiklerim", label: "Kaydettiklerim (0)" },
+                ] as const
+              ).map((tab) => {
+                const active = collectionsSubTab === tab.key;
+                return (
+                  <Pressable key={tab.key} onPress={() => setCollectionsSubTab(tab.key)}>
+                    <Text className={`text-sm font-semibold ${active ? "text-brand-orange" : "text-surface-text-muted"}`}>
+                      {tab.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable
+              onPress={() => setIsCreateCollectionOpen(true)}
+              className="flex-row items-center gap-1 rounded-full bg-brand-orange px-3 py-1.5"
+            >
+              <FolderPlus size={14} color="#ffffff" />
+              <Text className="text-xs font-semibold text-white">Yeni</Text>
+            </Pressable>
+          </View>
+
+          {collectionsSubTab === "kaydettiklerim" ? (
+            <View style={{ flex: 1 }} className="items-center justify-center gap-3 px-8">
+              <FolderHeart size={40} color={Colors.surfaceTextMuted} />
+              <Text className="text-center text-sm font-semibold text-foreground">Henüz kaydedilen koleksiyon yok</Text>
+              <Text className="text-center text-sm text-surface-text-muted">
+                Başkalarının paylaştığı koleksiyonları buraya kaydedebileceksin.
+              </Text>
+            </View>
+          ) : collectionList.length === 0 ? (
+            <View style={{ flex: 1 }} className="items-center justify-center gap-3 px-8">
+              <FolderPlus size={40} color={Colors.surfaceTextMuted} />
+              <Text className="text-center text-sm font-semibold text-foreground">Henüz koleksiyon oluşturmadın</Text>
+              <Text className="text-center text-sm text-surface-text-muted">
+                Favorilerini gruplamak için bir koleksiyon oluştur.
+              </Text>
+              <Pressable onPress={() => setIsCreateCollectionOpen(true)} className="rounded-full bg-brand-orange px-5 py-2.5">
+                <Text className="text-sm font-semibold text-white">Koleksiyon Oluştur</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <ScrollView contentContainerClassName="gap-3 pb-10">
+              <View className="flex-row flex-wrap gap-3">
+                {collectionList.map((collection) => (
+                  <Pressable
+                    key={collection.id}
+                    onPress={() => setOpenCollectionId(collection.id)}
+                    style={{ width: "47%" }}
+                    className="gap-2 rounded-2xl bg-surface-card p-3 shadow-sm"
+                  >
+                    <View style={{ aspectRatio: 1.4, borderRadius: 12, overflow: "hidden" }} className="items-center justify-center bg-surface-warm">
+                      <FolderHeart size={30} color={Colors.brandOrange} />
+                    </View>
+                    <View className="flex-row items-start justify-between gap-1">
+                      <View className="flex-1 gap-0.5">
+                        <Text numberOfLines={1} className="text-sm font-semibold text-foreground">
+                          {collection.name}
+                        </Text>
+                        <Text className="text-xs text-surface-text-muted">{collection.itemKeys.length} Ürün</Text>
+                      </View>
+                      <Pressable onPress={() => handleCollectionMenu(collection)} hitSlop={8}>
+                        <MoreVertical size={16} color={Colors.surfaceTextMuted} />
+                      </Pressable>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
+          )}
         </View>
       ) : (
         <ScrollView contentContainerClassName="gap-6 p-4 pb-10">
@@ -283,6 +402,24 @@ export default function FavoritesScreen() {
         onApply={setSelectedEquipment}
       />
       <EditFavoritesModal visible={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} />
+      <CreateCollectionModal
+        visible={isCreateCollectionOpen}
+        onClose={() => setIsCreateCollectionOpen(false)}
+        onCreate={handleCreateCollection}
+      />
+      <CreateCollectionModal
+        visible={Boolean(renamingCollection)}
+        initialName={renamingCollection?.name}
+        onClose={() => setRenamingCollection(null)}
+        onCreate={(name) => {
+          if (renamingCollection) dispatch(renameCollection({ id: renamingCollection.id, name }));
+        }}
+      />
+      <CollectionDetailModal
+        visible={Boolean(openCollection)}
+        collection={openCollection}
+        onClose={() => setOpenCollectionId(null)}
+      />
     </SafeAreaView>
   );
 }
