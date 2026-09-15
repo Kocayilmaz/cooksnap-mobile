@@ -29,7 +29,6 @@ import type { MealFavorite } from "@/lib/redux/mealFavoritesSlice";
 import AddToCollectionSheet from "@/components/AddToCollectionSheet";
 import CategoryFilterModal from "@/components/CategoryFilterModal";
 import ChecklistFilterModal from "@/components/ChecklistFilterModal";
-import CollectionDetailModal from "@/components/CollectionDetailModal";
 import CollectionOptionsSheet from "@/components/CollectionOptionsSheet";
 import CreateCollectionModal from "@/components/CreateCollectionModal";
 import EditFavoritesModal from "@/components/EditFavoritesModal";
@@ -78,8 +77,6 @@ export default function FavoritesScreen() {
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateCollectionOpen, setIsCreateCollectionOpen] = useState(false);
-  const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
-  const [autoOpenPicker, setAutoOpenPicker] = useState(false);
   const [renamingCollection, setRenamingCollection] = useState<Collection | null>(null);
   const [optionsCollection, setOptionsCollection] = useState<Collection | null>(null);
   const [singleAddItem, setSingleAddItem] = useState<{
@@ -92,7 +89,10 @@ export default function FavoritesScreen() {
   } | null>(null);
 
   const collectionList = Object.values(collections).sort((a, b) => b.createdAt - a.createdAt);
-  const openCollection: Collection | null = openCollectionId ? collections[openCollectionId] ?? null : null;
+
+  function openCollection(id: string, options?: { openAdd?: boolean }) {
+    router.push({ pathname: "/collection/[id]", params: { id, ...(options?.openAdd ? { openAdd: "1" } : {}) } });
+  }
 
   function handleCreateCollection(name: string) {
     dispatch(createCollection({ id: makeCollectionId(), name }));
@@ -263,39 +263,55 @@ export default function FavoritesScreen() {
           ) : (
             <ScrollView contentContainerClassName="gap-3 pb-4">
               <View className="flex-row flex-wrap gap-3">
-                {collectionList.map((collection) => (
-                  <Pressable
-                    key={collection.id}
-                    onPress={() => {
-                      setAutoOpenPicker(false);
-                      setOpenCollectionId(collection.id);
-                    }}
-                    style={{ width: "47%" }}
-                    className="gap-2 rounded-2xl bg-surface-card p-3 shadow-sm"
-                  >
-                    <View
-                      style={{ aspectRatio: 1.4, borderRadius: 12, overflow: "hidden" }}
-                      className="items-center justify-center bg-surface-warm"
+                {collectionList.map((collection) => {
+                  const thumbnails = collection.items.map((item) => item.thumbnail).filter((uri): uri is string => Boolean(uri));
+                  return (
+                    <Pressable
+                      key={collection.id}
+                      onPress={() => openCollection(collection.id)}
+                      style={{ width: "47%" }}
+                      className="gap-2 rounded-2xl bg-surface-card p-3 shadow-sm"
                     >
-                      {collection.items[0]?.thumbnail ? (
-                        <Image source={{ uri: collection.items[0].thumbnail }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
-                      ) : (
-                        <FolderPlus size={30} color={Colors.brandOrange} />
-                      )}
-                    </View>
-                    <View className="flex-row items-start justify-between gap-1">
-                      <View className="flex-1 gap-0.5">
+                      <View style={{ aspectRatio: 1.4, borderRadius: 12, overflow: "hidden" }} className="flex-row bg-surface-warm">
+                        {thumbnails.length === 0 ? (
+                          <View style={{ flex: 1 }} className="items-center justify-center">
+                            <FolderPlus size={30} color={Colors.brandOrange} />
+                          </View>
+                        ) : thumbnails.length === 1 ? (
+                          <Image source={{ uri: thumbnails[0] }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+                        ) : (
+                          <>
+                            <Image source={{ uri: thumbnails[0] }} style={{ flex: 1, height: "100%" }} contentFit="cover" />
+                            <View style={{ width: 2 }} />
+                            <Image source={{ uri: thumbnails[1] }} style={{ flex: 1, height: "100%" }} contentFit="cover" />
+                          </>
+                        )}
+                        <Pressable
+                          onPress={() => setOptionsCollection(collection)}
+                          hitSlop={8}
+                          style={{
+                            position: "absolute",
+                            top: 6,
+                            right: 6,
+                            height: 26,
+                            width: 26,
+                            borderRadius: 13,
+                            backgroundColor: "rgba(255,255,255,0.85)",
+                          }}
+                          className="items-center justify-center"
+                        >
+                          <MoreVertical size={15} color={Colors.foreground} />
+                        </Pressable>
+                      </View>
+                      <View className="gap-0.5">
                         <Text numberOfLines={1} className="text-sm font-semibold text-foreground">
                           {collection.name}
                         </Text>
                         <Text className="text-xs text-surface-text-muted">{collection.items.length} Ürün</Text>
                       </View>
-                      <Pressable onPress={() => setOptionsCollection(collection)} hitSlop={8}>
-                        <MoreVertical size={16} color={Colors.surfaceTextMuted} />
-                      </Pressable>
-                    </View>
-                  </Pressable>
-                ))}
+                    </Pressable>
+                  );
+                })}
               </View>
             </ScrollView>
           )}
@@ -358,6 +374,7 @@ export default function FavoritesScreen() {
                 {favoriteChats.map((entry) => (
                   <Pressable
                     key={entry.id}
+                    onPress={() => router.push({ pathname: "/(tabs)/chat", params: { historyEntryId: entry.id } })}
                     onLongPress={() => openChatCollectionSheet(entry)}
                     className="flex-row items-center justify-between gap-2 rounded-xl border border-surface-border p-3"
                   >
@@ -386,6 +403,7 @@ export default function FavoritesScreen() {
                 {allRecipes.map((recipe) => (
                   <Pressable
                     key={recipe.id}
+                    onPress={() => router.push({ pathname: "/recipe/[id]", params: { id: recipe.id } })}
                     onLongPress={() => openRecipeCollectionSheet(recipe)}
                     className="rounded-xl border border-surface-border p-3"
                   >
@@ -425,10 +443,7 @@ export default function FavoritesScreen() {
       <EditFavoritesModal
         visible={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
-        onCollectionDone={(collectionId) => {
-          setAutoOpenPicker(false);
-          setOpenCollectionId(collectionId);
-        }}
+        onCollectionDone={(collectionId) => openCollection(collectionId)}
       />
       <CreateCollectionModal
         visible={isCreateCollectionOpen}
@@ -447,11 +462,7 @@ export default function FavoritesScreen() {
         visible={Boolean(optionsCollection)}
         collection={optionsCollection}
         onClose={() => setOptionsCollection(null)}
-        onAddItem={() => {
-          if (!optionsCollection) return;
-          setAutoOpenPicker(true);
-          setOpenCollectionId(optionsCollection.id);
-        }}
+        onAddItem={() => optionsCollection && openCollection(optionsCollection.id, { openAdd: true })}
         onRename={() => setRenamingCollection(optionsCollection)}
         onDelete={() =>
           optionsCollection &&
@@ -461,23 +472,13 @@ export default function FavoritesScreen() {
           ])
         }
       />
-      <CollectionDetailModal
-        visible={Boolean(openCollection)}
-        collection={openCollection}
-        autoOpenPicker={autoOpenPicker}
-        onClose={() => {
-          setOpenCollectionId(null);
-          setAutoOpenPicker(false);
-        }}
-      />
       <AddToCollectionSheet
         visible={Boolean(singleAddItem)}
         onClose={() => setSingleAddItem(null)}
         items={singleAddItem ? [singleAddItem] : []}
         onDone={(collectionId) => {
           setSingleAddItem(null);
-          setAutoOpenPicker(false);
-          setOpenCollectionId(collectionId);
+          openCollection(collectionId);
         }}
       />
     </SafeAreaView>
