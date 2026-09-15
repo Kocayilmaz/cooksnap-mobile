@@ -3,16 +3,26 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 /**
  * Kullanıcı tanımlı koleksiyonlar — favorilenmiş tarifleri/sohbetleri kendi
  * gruplarında toplamak için (bkz. AddToCollectionSheet, favorites.tsx'teki
- * "Koleksiyonlar" sekmesi). Her öğe "meal:<id>" / "recipe:<id>" /
- * "chat:<id>" biçiminde kompozit bir anahtarla tutuluyor — hangi favori
- * slice'ından geldiğini ayırt etmek için (bkz. EditFavoritesModal'daki aynı
- * desen).
+ * "Koleksiyonlar" sekmesi). Öğeler favorilerden BAĞIMSIZ olarak burada bir
+ * anlık görüntü (snapshot) olarak tutuluyor — "Koleksiyona Ekle ve
+ * Favorilerden Sil" seçildiğinde öğe favoriler slice'ından silinse de
+ * koleksiyonda görünmeye devam etsin diye (bkz. CollectionDetailModal).
+ * "key" alanı "meal:<id>" / "recipe:<id>" / "chat:<id>" biçiminde — hangi
+ * favori slice'ından geldiğini ayırt etmek için (bkz. useFavoriteTiles).
  */
+export interface CollectionItem {
+  key: string;
+  kind: "meal" | "recipe" | "chat";
+  title: string;
+  subtitle: string;
+  thumbnail: string | null;
+}
+
 export interface Collection {
   id: string;
   name: string;
   createdAt: number;
-  itemKeys: string[];
+  items: CollectionItem[];
 }
 
 export type CollectionsState = Record<string, Collection>;
@@ -28,7 +38,7 @@ const collectionsSlice = createSlice({
         id: action.payload.id,
         name: action.payload.name,
         createdAt: Date.now(),
-        itemKeys: [],
+        items: [],
       };
     },
     renameCollection(state, action: PayloadAction<{ id: string; name: string }>) {
@@ -38,15 +48,15 @@ const collectionsSlice = createSlice({
     deleteCollection(state, action: PayloadAction<string>) {
       delete state[action.payload];
     },
-    addItemToCollection(state, action: PayloadAction<{ collectionId: string; itemKey: string }>) {
+    addItemToCollection(state, action: PayloadAction<{ collectionId: string; item: CollectionItem }>) {
       const collection = state[action.payload.collectionId];
-      if (collection && !collection.itemKeys.includes(action.payload.itemKey)) {
-        collection.itemKeys.push(action.payload.itemKey);
+      if (collection && !collection.items.some((existing) => existing.key === action.payload.item.key)) {
+        collection.items.push(action.payload.item);
       }
     },
     removeItemFromCollection(state, action: PayloadAction<{ collectionId: string; itemKey: string }>) {
       const collection = state[action.payload.collectionId];
-      if (collection) collection.itemKeys = collection.itemKeys.filter((key) => key !== action.payload.itemKey);
+      if (collection) collection.items = collection.items.filter((item) => item.key !== action.payload.itemKey);
     },
     setCollections(_state, action: PayloadAction<CollectionsState>) {
       return action.payload;

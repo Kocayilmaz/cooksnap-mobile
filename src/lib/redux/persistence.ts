@@ -8,7 +8,7 @@ import type { MealFavorite, MealFavoritesState } from "./mealFavoritesSlice";
 import type { MealSearchHistoryState } from "./mealSearchHistorySlice";
 import type { UsageCounterState } from "./usageCounterSlice";
 import type { HistoryEntry, HistoryState } from "./historySlice";
-import type { Collection, CollectionsState } from "./collectionsSlice";
+import type { Collection, CollectionItem, CollectionsState } from "./collectionsSlice";
 
 /**
  * ne-pisirsem (web) her tercihi ayrı bir localStorage anahtarında tutuyordu
@@ -128,6 +128,17 @@ export const writeStoredMealFavorites = (value: MealFavoritesState) => writeJSON
 
 // --- collections ---
 const COLLECTIONS_STORAGE_KEY = "cooksnap:collections";
+function isCollectionItem(value: unknown): value is CollectionItem {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Partial<CollectionItem>;
+  return (
+    typeof record.key === "string" &&
+    (record.kind === "meal" || record.kind === "recipe" || record.kind === "chat") &&
+    typeof record.title === "string" &&
+    typeof record.subtitle === "string" &&
+    (record.thumbnail === null || typeof record.thumbnail === "string")
+  );
+}
 function isCollection(value: unknown): value is Collection {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Partial<Collection>;
@@ -135,8 +146,8 @@ function isCollection(value: unknown): value is Collection {
     typeof record.id === "string" &&
     typeof record.name === "string" &&
     typeof record.createdAt === "number" &&
-    Array.isArray(record.itemKeys) &&
-    record.itemKeys.every((key) => typeof key === "string")
+    Array.isArray(record.items) &&
+    record.items.every(isCollectionItem)
   );
 }
 function isCollectionsState(value: unknown): value is CollectionsState {
