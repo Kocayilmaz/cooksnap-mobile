@@ -8,6 +8,7 @@ import type { MealFavorite, MealFavoritesState } from "./mealFavoritesSlice";
 import type { MealSearchHistoryState } from "./mealSearchHistorySlice";
 import type { UsageCounterState } from "./usageCounterSlice";
 import type { HistoryEntry, HistoryState } from "./historySlice";
+import type { Collection, CollectionsState } from "./collectionsSlice";
 
 /**
  * ne-pisirsem (web) her tercihi ayrı bir localStorage anahtarında tutuyordu
@@ -124,6 +125,26 @@ function isMealFavoritesState(value: unknown): value is MealFavoritesState {
 }
 export const readStoredMealFavorites = () => readJSON(MEAL_FAVORITES_STORAGE_KEY, isMealFavoritesState);
 export const writeStoredMealFavorites = (value: MealFavoritesState) => writeJSON(MEAL_FAVORITES_STORAGE_KEY, value);
+
+// --- collections ---
+const COLLECTIONS_STORAGE_KEY = "cooksnap:collections";
+function isCollection(value: unknown): value is Collection {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Partial<Collection>;
+  return (
+    typeof record.id === "string" &&
+    typeof record.name === "string" &&
+    typeof record.createdAt === "number" &&
+    Array.isArray(record.itemKeys) &&
+    record.itemKeys.every((key) => typeof key === "string")
+  );
+}
+function isCollectionsState(value: unknown): value is CollectionsState {
+  if (typeof value !== "object" || value === null) return false;
+  return Object.values(value).every(isCollection);
+}
+export const readStoredCollections = () => readJSON(COLLECTIONS_STORAGE_KEY, isCollectionsState);
+export const writeStoredCollections = (value: CollectionsState) => writeJSON(COLLECTIONS_STORAGE_KEY, value);
 
 // --- mealSearchHistory ---
 const MEAL_SEARCH_HISTORY_STORAGE_KEY = "cooksnap:mealSearchHistory";

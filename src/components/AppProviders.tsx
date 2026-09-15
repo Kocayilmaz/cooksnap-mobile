@@ -4,6 +4,8 @@ import { makeStore, type AppStore } from "@/lib/redux/store";
 import {
   readStoredApiKey,
   writeStoredApiKey,
+  readStoredCollections,
+  writeStoredCollections,
   readStoredEquipment,
   writeStoredEquipment,
   readStoredFavorites,
@@ -22,6 +24,7 @@ import {
   writeStoredUserProfile,
 } from "@/lib/redux/persistence";
 import { setProvider, setKey } from "@/lib/redux/apiKeySlice";
+import { setCollections } from "@/lib/redux/collectionsSlice";
 import { setEquipment } from "@/lib/redux/equipmentSlice";
 import { setFavorites } from "@/lib/redux/favoritesSlice";
 import { setGuestMode } from "@/lib/redux/guestModeSlice";
@@ -50,6 +53,7 @@ export default function AppProviders({ children }: { children: ReactNode }) {
     (async () => {
       const [
         storedApiKey,
+        storedCollections,
         storedEquipment,
         storedFavorites,
         storedGuestMode,
@@ -60,6 +64,7 @@ export default function AppProviders({ children }: { children: ReactNode }) {
         storedUserProfile,
       ] = await Promise.all([
         readStoredApiKey(),
+        readStoredCollections(),
         readStoredEquipment(),
         readStoredFavorites(),
         readStoredGuestMode(),
@@ -76,6 +81,7 @@ export default function AppProviders({ children }: { children: ReactNode }) {
         store.dispatch(setProvider(storedApiKey.provider));
         store.dispatch(setKey(storedApiKey.key));
       }
+      if (storedCollections) store.dispatch(setCollections(storedCollections));
       if (storedEquipment) store.dispatch(setEquipment(storedEquipment));
       if (storedFavorites) store.dispatch(setFavorites(storedFavorites));
       if (storedGuestMode) store.dispatch(setGuestMode(true));
@@ -113,6 +119,17 @@ export default function AppProviders({ children }: { children: ReactNode }) {
       const current = store.getState().apiKey;
       if (current !== previous) {
         void writeStoredApiKey(current);
+        previous = current;
+      }
+    });
+  }, [store]);
+
+  useEffect(() => {
+    let previous = store.getState().collections;
+    return store.subscribe(() => {
+      const current = store.getState().collections;
+      if (current !== previous) {
+        void writeStoredCollections(current);
         previous = current;
       }
     });
