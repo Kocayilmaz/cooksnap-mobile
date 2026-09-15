@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, Share, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, PlayCircle } from "lucide-react-native";
+import { ArrowLeft, Heart, PlayCircle, Share2 } from "lucide-react-native";
 import { getMealDetail } from "@/lib/api/client";
+import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
+import { toggleMealFavorite } from "@/lib/redux/mealFavoritesSlice";
+import { notify } from "@/lib/notify";
 import { Colors } from "@/constants/theme";
 import type { MealDetail } from "@/lib/types/meal";
 
@@ -18,6 +21,8 @@ import type { MealDetail } from "@/lib/types/meal";
 export default function MealDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const isFavorited = useAppSelector((state) => Boolean(state.mealFavorites[id]));
   const [meal, setMeal] = useState<MealDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,13 +40,39 @@ export default function MealDetailScreen() {
     };
   }, [id]);
 
+  async function handleShare() {
+    if (!meal) return;
+    try {
+      await Share.share({ message: `${meal.name}\n${[meal.category, meal.area].filter(Boolean).join(" · ")}` });
+    } catch {
+      // kullanıcı paylaşım sayfasını kapattıysa best-effort, hata göstermeye gerek yok.
+    }
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-surface-warm">
       <ScrollView contentContainerClassName="gap-4 p-4 pb-10">
-        <Pressable onPress={() => router.back()} className="flex-row items-center gap-1.5">
-          <ArrowLeft size={16} color={Colors.surfaceTextMuted} />
-          <Text className="text-sm font-medium text-surface-text-muted">Geri</Text>
-        </Pressable>
+        <View className="flex-row items-center justify-between">
+          <Pressable onPress={() => router.back()} className="flex-row items-center gap-1.5">
+            <ArrowLeft size={16} color={Colors.surfaceTextMuted} />
+            <Text className="text-sm font-medium text-surface-text-muted">Geri</Text>
+          </Pressable>
+
+          {meal && (
+            <View className="flex-row items-center gap-4">
+              <Pressable onPress={handleShare} hitSlop={8}>
+                <Share2 size={19} color={Colors.surfaceTextMuted} />
+              </Pressable>
+              <Pressable
+                onPress={() => dispatch(toggleMealFavorite(meal))}
+                onLongPress={() => notify("Koleksiyonlar yakında")}
+                hitSlop={8}
+              >
+                <Heart size={20} color={Colors.brandOrange} fill={isFavorited ? Colors.brandOrange : "none"} />
+              </Pressable>
+            </View>
+          )}
+        </View>
 
         {!meal && !error && (
           <View style={{ paddingVertical: 48 }} className="items-center">
