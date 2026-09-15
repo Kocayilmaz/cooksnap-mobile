@@ -12,7 +12,7 @@ interface CreateCollectionModalProps {
   initialName?: string;
 }
 
-const SUGGESTED_NAMES = ["Kış Koleksiyonum 🎉", "Güzel Evim 🏠", "Makyaj", "Elektronik 💻", "Aksesuar"];
+const SUGGESTED_NAMES = ["Kahvaltılıklarım 🍳", "Akşam Yemeklerim 🍽️", "Tatlı Tariflerim 🍰", "Sağlıklı Tarifler 🥗", "Pratik Tarifler ⏱️"];
 
 /** Boş bir isim girişiyle koleksiyon oluşturma (ya da mevcut birini
  * yeniden adlandırma) ekranı — hem doğrudan Koleksiyonlar sekmesinden hem
