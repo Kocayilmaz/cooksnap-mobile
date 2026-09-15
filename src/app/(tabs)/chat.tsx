@@ -98,7 +98,7 @@ export default function ChatScreen() {
   // Anasayfadaki IngredientPicker /chat'e { ingredients } param'ıyla
   // yönlendiriyor (bkz. components/IngredientPicker.tsx) — web'deki
   // /chat?ingredients=... ile aynı akış.
-  const params = useLocalSearchParams<{ ingredients?: string }>();
+  const params = useLocalSearchParams<{ ingredients?: string; historyEntryId?: string }>();
   const dispatch = useAppDispatch();
   const equipmentState = useAppSelector((state) => state.equipment);
   const personCount = useAppSelector((state) => state.personCount.value);
@@ -153,6 +153,17 @@ export default function ChatScreen() {
       useNativeDriver: true,
     }).start();
   }, [isSidebarOpen, pushX]);
+
+  // Favoriler'deki "Sohbet Favorileri" satırına dokunulunca (bkz.
+  // favorites.tsx) buraya { historyEntryId } param'ıyla yönlendiriliyor —
+  // o sohbeti en baştan handleSelectEntry ile aynen ChatSidebarDrawer'dan
+  // seçilmiş gibi yükler.
+  useEffect(() => {
+    if (!params.historyEntryId) return;
+    const entry = history.find((item) => item.id === params.historyEntryId);
+    if (entry) handleSelectEntry(entry);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.historyEntryId]);
 
   const hasIngredientsText = ingredientsText.trim().length > 0;
   const hasStartedChat = messages.length > 0;
@@ -465,6 +476,8 @@ export default function ChatScreen() {
                       text={message.text}
                       createdAt={message.createdAt}
                       onBranch={() => handleBranchFrom(message.id)}
+                      isChatFavorite={Boolean(currentEntry?.isFavorite)}
+                      onToggleChatFavorite={handleTogglePin}
                     />
                   )}
                 </View>

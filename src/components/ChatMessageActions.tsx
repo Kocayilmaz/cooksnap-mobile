@@ -16,11 +16,14 @@ interface ChatMessageActionsProps {
    * yıldızla bunları kullanır. */
   recipes?: RecipeSuggestion[];
   /** Tarif kartı olmayan, düz metin cevaplar için (bkz. app/(tabs)/chat.tsx
-   * handleSelectEntry'nin ürettiği özet mesajlar) — yıldız gösterilmez,
-   * çünkü favorileme yapılandırılmış tarif verisine ihtiyaç duyuyor. */
+   * handleSelectEntry'nin ürettiği özet mesajlar). Bu durumda yıldız tek
+   * tek tarif değil, tüm sohbeti (isChatFavorite/onToggleChatFavorite ile)
+   * favoriliyor — her AI cevabının altında bir yıldız olsun diye. */
   text?: string;
   createdAt: number;
   onBranch: () => void;
+  isChatFavorite?: boolean;
+  onToggleChatFavorite?: () => void;
 }
 
 /**
@@ -31,7 +34,14 @@ interface ChatMessageActionsProps {
  * sohbet olarak kaydedip oraya geçiyor — ChatGPT'nin "branch in new chat"
  * özelliğinin karşılığı (bkz. handleBranchFrom, app/(tabs)/chat.tsx).
  */
-export default function ChatMessageActions({ recipes = [], text, createdAt, onBranch }: ChatMessageActionsProps) {
+export default function ChatMessageActions({
+  recipes = [],
+  text,
+  createdAt,
+  onBranch,
+  isChatFavorite,
+  onToggleChatFavorite,
+}: ChatMessageActionsProps) {
   const dispatch = useAppDispatch();
   const favorites = useAppSelector((state) => state.favorites);
   const hasRecipes = recipes.length > 0;
@@ -81,10 +91,16 @@ export default function ChatMessageActions({ recipes = [], text, createdAt, onBr
         <Pressable onPress={handleDownload} hitSlop={8}>
           <Download size={15} color={Colors.surfaceTextMuted} />
         </Pressable>
-        {hasRecipes && (
+        {hasRecipes ? (
           <Pressable onPress={handleToggleFavorite} hitSlop={8}>
             <Star size={15} color={Colors.brandOrange} fill={isFavorite ? Colors.brandOrange : "none"} />
           </Pressable>
+        ) : (
+          onToggleChatFavorite && (
+            <Pressable onPress={onToggleChatFavorite} hitSlop={8}>
+              <Star size={15} color={Colors.brandOrange} fill={isChatFavorite ? Colors.brandOrange : "none"} />
+            </Pressable>
+          )
         )}
         <Pressable onPress={onBranch} hitSlop={8}>
           <GitBranch size={15} color={Colors.surfaceTextMuted} />
