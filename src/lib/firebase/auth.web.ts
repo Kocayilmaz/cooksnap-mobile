@@ -4,6 +4,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
+  updateEmail,
+  updatePassword,
   type Auth,
   type Unsubscribe,
   type User,
@@ -62,6 +64,8 @@ function toTurkishErrorMessage(error: unknown): string {
       return "E-posta veya şifre hatalı.";
     case "auth/too-many-requests":
       return "Çok fazla deneme yapıldı, biraz sonra tekrar dene.";
+    case "auth/requires-recent-login":
+      return "Bu işlem için güvenlik nedeniyle yeniden giriş yapman gerekiyor.";
     default:
       console.error("Firebase auth hatasi:", error);
       return "Bir şeyler ters gitti, tekrar dene.";
@@ -94,6 +98,30 @@ export async function signInWithEmail(email: string, password: string): Promise<
 
 export async function signInWithGoogle(): Promise<AuthResult> {
   return { ok: false, errorMessage: "Google ile giriş mobilde henüz eklenmedi." };
+}
+
+export async function changeEmail(newEmail: string): Promise<AuthResult> {
+  const auth = getFirebaseAuth();
+  if (!auth?.currentUser) return { ok: false, errorMessage: "Giriş sistemi şu an kullanılamıyor." };
+
+  try {
+    await updateEmail(auth.currentUser, newEmail);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, errorMessage: toTurkishErrorMessage(error) };
+  }
+}
+
+export async function changePassword(newPassword: string): Promise<AuthResult> {
+  const auth = getFirebaseAuth();
+  if (!auth?.currentUser) return { ok: false, errorMessage: "Giriş sistemi şu an kullanılamıyor." };
+
+  try {
+    await updatePassword(auth.currentUser, newPassword);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, errorMessage: toTurkishErrorMessage(error) };
+  }
 }
 
 export async function signOutUser(): Promise<void> {
