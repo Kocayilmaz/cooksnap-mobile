@@ -50,8 +50,11 @@ export default function ChecklistFilterModal({
   }
 
   // RN'in <Modal>'ı Android'de bu ortamda üst köşe borderRadius'unu
-  // klipsizlemiyor, o yüzden native Modal yerine ekranı kaplayan mutlak
-  // konumlu düz bir View kullanılıyor; donanım geri tuşu elle bağlanıyor.
+  // klipsizlemiyor, o yüzden native Modal yerine iki ayrı absolute sibling
+  // kullanılıyor (backdrop + sheet) — sheet'i flex ile bir wrapper içine
+  // koymak borderRadius'u bozuyordu, ama sheet'in kendisi doğrudan
+  // bottom/left/right: 0 ile absolute olunca düzgün klipsleniyor.
+  // Donanım geri tuşu elle bağlanıyor.
   useEffect(() => {
     if (!visible) return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -64,15 +67,23 @@ export default function ChecklistFilterModal({
   if (!visible) return null;
 
   return (
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(23,23,23,0.4)" }} />
-      <View style={{ maxHeight: "75%" }}>
+    <>
+      <Pressable
+        onPress={onClose}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000, backgroundColor: "rgba(23,23,23,0.4)" }}
+      />
       <View
         style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1001,
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
           overflow: "hidden",
           backgroundColor: Colors.surfaceWarm,
+          maxHeight: "75%",
         }}
       >
       <View
@@ -143,7 +154,6 @@ export default function ChecklistFilterModal({
         </View>
       </View>
       </View>
-      </View>
-    </View>
+    </>
   );
 }

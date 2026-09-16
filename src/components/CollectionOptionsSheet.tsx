@@ -16,8 +16,10 @@ interface CollectionOptionsSheetProps {
 /** Koleksiyon kartındaki "..." menüsü — alttan açılan bir panel (bkz.
  * favorites.tsx). Panel zaten üstüne dokununca (backdrop) kapandığı için
  * ayrı bir "Vazgeç" satırı yok. RN'in <Modal>'ı Android'de bu ortamda üst
- * köşe borderRadius'unu klipsizlemiyor, o yüzden native Modal yerine
- * ekranı kaplayan mutlak konumlu düz bir View kullanılıyor. */
+ * köşe borderRadius'unu klipsizlemiyor, o yüzden native Modal yerine iki
+ * ayrı absolute sibling kullanılıyor (backdrop + panel) — panel'i flex ile
+ * bir wrapper içine koymak borderRadius'u bozuyordu, ama panelin kendisi
+ * doğrudan bottom/left/right: 0 ile absolute olunca düzgün klipsleniyor. */
 export default function CollectionOptionsSheet({ visible, onClose, collection, onAddItem, onRename, onDelete }: CollectionOptionsSheetProps) {
   useEffect(() => {
     if (!visible) return;
@@ -41,18 +43,22 @@ export default function CollectionOptionsSheet({ visible, onClose, collection, o
   }
 
   return (
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(23,23,23,0.4)" }} />
+    <>
+      <Pressable
+        onPress={onClose}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000, backgroundColor: "rgba(23,23,23,0.4)" }}
+      />
       <View
         style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1001,
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
           overflow: "hidden",
           backgroundColor: Colors.surfaceWarm,
-        }}
-      >
-      <View
-        style={{
           gap: 4,
           paddingHorizontal: 16,
           paddingTop: 16,
@@ -97,7 +103,6 @@ export default function CollectionOptionsSheet({ visible, onClose, collection, o
           <Text className="text-sm font-medium text-state-error">Sil</Text>
         </Pressable>
       </View>
-      </View>
-    </View>
+    </>
   );
 }

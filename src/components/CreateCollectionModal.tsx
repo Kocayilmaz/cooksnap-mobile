@@ -16,7 +16,9 @@ const SUGGESTED_NAMES = ["Kahvaltılıklarım 🍳", "Akşam Yemeklerim 🍽️"
 
 /** Boş bir isim girişiyle koleksiyon oluşturma (ya da mevcut birini
  * yeniden adlandırma) ekranı — hem doğrudan Koleksiyonlar sekmesinden hem
- * de AddToCollectionSheet'in "Yeni Oluştur" adımından kullanılıyor. */
+ * de AddToCollectionSheet'in "Yeni Oluştur" adımından kullanılıyor. zIndex
+ * 2000/2001, AddToCollectionSheet/CollectionOptionsSheet'in 1000/1001'inin
+ * üstünde kalması için — bu ikisinin üstünde açılabiliyor. */
 export default function CreateCollectionModal({ visible, onClose, onCreate, initialName }: CreateCollectionModalProps) {
   const isRenaming = Boolean(initialName);
   const [name, setName] = useState(initialName ?? "");
@@ -26,8 +28,11 @@ export default function CreateCollectionModal({ visible, onClose, onCreate, init
   }, [visible, initialName]);
 
   // RN'in <Modal>'ı Android'de bu ortamda üst köşe borderRadius'unu
-  // klipsizlemiyor, o yüzden native Modal yerine ekranı kaplayan mutlak
-  // konumlu düz bir View kullanılıyor; donanım geri tuşu elle bağlanıyor.
+  // klipsizlemiyor, o yüzden native Modal yerine iki ayrı absolute sibling
+  // kullanılıyor (backdrop + sheet) — sheet'i flex ile bir wrapper içine
+  // koymak borderRadius'u bozuyordu, ama sheet'in kendisi doğrudan
+  // bottom/left/right: 0 ile absolute olunca düzgün klipsleniyor.
+  // Donanım geri tuşu elle bağlanıyor.
   useEffect(() => {
     if (!visible) return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -47,19 +52,23 @@ export default function CreateCollectionModal({ visible, onClose, onCreate, init
   if (!visible) return null;
 
   return (
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(23,23,23,0.4)" }} />
-      <View style={{ maxHeight: "80%" }}>
+    <>
+      <Pressable
+        onPress={onClose}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 2000, backgroundColor: "rgba(23,23,23,0.4)" }}
+      />
       <View
         style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 2001,
+          maxHeight: "80%",
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
           overflow: "hidden",
           backgroundColor: Colors.surfaceWarm,
-        }}
-      >
-      <View
-        style={{
           gap: 16,
           padding: 16,
         }}
@@ -119,8 +128,6 @@ export default function CreateCollectionModal({ visible, onClose, onCreate, init
           <Text className="text-sm font-semibold text-white">{isRenaming ? "Kaydet" : "Koleksiyon Oluştur"}</Text>
         </Pressable>
       </View>
-      </View>
-      </View>
-    </View>
+    </>
   );
 }

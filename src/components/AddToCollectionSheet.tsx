@@ -48,9 +48,11 @@ export default function AddToCollectionSheet({ visible, onClose, items, onDone }
   }, [visible]);
 
   // RN'in <Modal>'ı Android'de bu ortamda üst köşe borderRadius'unu
-  // klipsizlemiyor (transparent + slide Dialog'unda), o yüzden bu sheet
-  // native Modal yerine ekranı kaplayan mutlak konumlu düz bir View —
-  // donanım geri tuşu da aynı davranışı taklit etsin diye elle bağlanıyor.
+  // klipsizlemiyor, o yüzden native Modal yerine iki ayrı absolute sibling
+  // kullanılıyor (backdrop + sheet) — sheet'i flex ile bir wrapper içine
+  // koymak (backdrop'un flex:1 ile onu ittiği düzen) borderRadius'u
+  // bozuyordu, ama sheet'in kendisi doğrudan bottom/left/right: 0 ile
+  // absolute olunca düzgün klipsleniyor. Donanım geri tuşu elle bağlanıyor.
   useEffect(() => {
     if (!visible) return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -101,23 +103,26 @@ export default function AddToCollectionSheet({ visible, onClose, items, onDone }
 
   return (
     <>
-      <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
-        <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(23,23,23,0.4)" }} />
-        <View style={{ maxHeight: "80%" }}>
-        <View
-          style={{
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            overflow: "hidden",
-            backgroundColor: Colors.surfaceWarm,
-          }}
-        >
-        <View
-          style={{
-            gap: 16,
-            padding: 16,
-          }}
-        >
+      <Pressable
+        onPress={onClose}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000, backgroundColor: "rgba(23,23,23,0.4)" }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1001,
+          maxHeight: "80%",
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          overflow: "hidden",
+          backgroundColor: Colors.surfaceWarm,
+          gap: 16,
+          padding: 16,
+        }}
+      >
           {step === "list" ? (
             <>
               <View className="gap-1">
@@ -161,9 +166,6 @@ export default function AddToCollectionSheet({ visible, onClose, items, onDone }
               </Pressable>
             </View>
           )}
-        </View>
-        </View>
-        </View>
       </View>
 
       <CreateCollectionModal visible={isCreateOpen} onClose={() => setIsCreateOpen(false)} onCreate={handleCreateCollection} />
