@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { BackHandler, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Check, X } from "lucide-react-native";
 import { Colors } from "@/constants/theme";
 
@@ -25,6 +25,18 @@ export default function CreateCollectionModal({ visible, onClose, onCreate, init
     if (visible) setName(initialName ?? "");
   }, [visible, initialName]);
 
+  // RN'in <Modal>'ı Android'de bu ortamda üst köşe borderRadius'unu
+  // klipsizlemiyor, o yüzden native Modal yerine ekranı kaplayan mutlak
+  // konumlu düz bir View kullanılıyor; donanım geri tuşu elle bağlanıyor.
+  useEffect(() => {
+    if (!visible) return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [visible, onClose]);
+
   function handleCreate() {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -32,10 +44,26 @@ export default function CreateCollectionModal({ visible, onClose, onCreate, init
     onClose();
   }
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
       <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(23,23,23,0.4)" }} />
-      <View style={{ borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%" }} className="gap-4 bg-surface-warm p-4">
+      <View style={{ maxHeight: "80%" }}>
+      <View
+        style={{
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          overflow: "hidden",
+          backgroundColor: Colors.surfaceWarm,
+        }}
+      >
+      <View
+        style={{
+          gap: 16,
+          padding: 16,
+        }}
+      >
         <View className="flex-row items-center justify-between">
           <Pressable onPress={onClose} hitSlop={8}>
             <X size={20} color={Colors.surfaceTextMuted} />
@@ -91,6 +119,8 @@ export default function CreateCollectionModal({ visible, onClose, onCreate, init
           <Text className="text-sm font-semibold text-white">{isRenaming ? "Kaydet" : "Koleksiyon Oluştur"}</Text>
         </Pressable>
       </View>
-    </Modal>
+      </View>
+      </View>
+    </View>
   );
 }

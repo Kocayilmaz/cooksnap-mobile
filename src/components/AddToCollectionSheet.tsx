@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { BackHandler, Pressable, ScrollView, Text, View } from "react-native";
 import { Folder, FolderPlus, Plus, Trash2, X } from "lucide-react-native";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { addItemToCollection, createCollection, type CollectionItem } from "@/lib/redux/collectionsSlice";
@@ -47,6 +47,19 @@ export default function AddToCollectionSheet({ visible, onClose, items, onDone }
     if (visible) setStep("list");
   }, [visible]);
 
+  // RN'in <Modal>'ı Android'de bu ortamda üst köşe borderRadius'unu
+  // klipsizlemiyor (transparent + slide Dialog'unda), o yüzden bu sheet
+  // native Modal yerine ekranı kaplayan mutlak konumlu düz bir View —
+  // donanım geri tuşu da aynı davranışı taklit etsin diye elle bağlanıyor.
+  useEffect(() => {
+    if (!visible) return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [visible, onClose]);
+
   const collectionList = Object.values(collections).sort((a, b) => b.createdAt - a.createdAt);
 
   function addItemsTo(collectionId: string) {
@@ -84,11 +97,27 @@ export default function AddToCollectionSheet({ visible, onClose, items, onDone }
     finish();
   }
 
+  if (!visible) return null;
+
   return (
     <>
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
         <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(23,23,23,0.4)" }} />
-        <View style={{ borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%" }} className="gap-4 bg-surface-warm p-4">
+        <View style={{ maxHeight: "80%" }}>
+        <View
+          style={{
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            overflow: "hidden",
+            backgroundColor: Colors.surfaceWarm,
+          }}
+        >
+        <View
+          style={{
+            gap: 16,
+            padding: 16,
+          }}
+        >
           {step === "list" ? (
             <>
               <View className="gap-1">
@@ -133,7 +162,9 @@ export default function AddToCollectionSheet({ visible, onClose, items, onDone }
             </View>
           )}
         </View>
-      </Modal>
+        </View>
+        </View>
+      </View>
 
       <CreateCollectionModal visible={isCreateOpen} onClose={() => setIsCreateOpen(false)} onCreate={handleCreateCollection} />
     </>

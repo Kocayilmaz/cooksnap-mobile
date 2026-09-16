@@ -1,4 +1,5 @@
-import { Modal, Pressable, Share, Text, View } from "react-native";
+import { useEffect } from "react";
+import { BackHandler, Pressable, Share, Text, View } from "react-native";
 import { Pencil, Plus, Share2, Trash2 } from "lucide-react-native";
 import type { Collection } from "@/lib/redux/collectionsSlice";
 import { Colors } from "@/constants/theme";
@@ -14,9 +15,20 @@ interface CollectionOptionsSheetProps {
 
 /** Koleksiyon kartındaki "..." menüsü — alttan açılan bir panel (bkz.
  * favorites.tsx). Panel zaten üstüne dokununca (backdrop) kapandığı için
- * ayrı bir "Vazgeç" satırı yok. */
+ * ayrı bir "Vazgeç" satırı yok. RN'in <Modal>'ı Android'de bu ortamda üst
+ * köşe borderRadius'unu klipsizlemiyor, o yüzden native Modal yerine
+ * ekranı kaplayan mutlak konumlu düz bir View kullanılıyor. */
 export default function CollectionOptionsSheet({ visible, onClose, collection, onAddItem, onRename, onDelete }: CollectionOptionsSheetProps) {
-  if (!collection) return null;
+  useEffect(() => {
+    if (!visible) return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [visible, onClose]);
+
+  if (!visible || !collection) return null;
 
   async function handleShare() {
     onClose();
@@ -29,9 +41,24 @@ export default function CollectionOptionsSheet({ visible, onClose, collection, o
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
       <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(23,23,23,0.4)" }} />
-      <View style={{ borderTopLeftRadius: 20, borderTopRightRadius: 20 }} className="gap-1 bg-surface-warm p-4 pb-6">
+      <View
+        style={{
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          overflow: "hidden",
+          backgroundColor: Colors.surfaceWarm,
+        }}
+      >
+      <View
+        style={{
+          gap: 4,
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 24,
+        }}
+      >
         <Text numberOfLines={1} className="px-1 pb-2 text-sm font-semibold text-surface-text-muted">
           {collection.name}
         </Text>
@@ -70,6 +97,7 @@ export default function CollectionOptionsSheet({ visible, onClose, collection, o
           <Text className="text-sm font-medium text-state-error">Sil</Text>
         </Pressable>
       </View>
-    </Modal>
+      </View>
+    </View>
   );
 }
