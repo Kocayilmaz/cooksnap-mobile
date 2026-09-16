@@ -37,6 +37,8 @@ function RootNavigation() {
         <Stack.Screen name="meal/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="collection/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="recipe/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="edit-favorites" options={{ headerShown: false }} />
+        <Stack.Screen name="profile" options={{ headerShown: false }} />
       </Stack.Protected>
     </Stack>
   );

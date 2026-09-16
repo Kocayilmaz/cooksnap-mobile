@@ -31,7 +31,6 @@ import CategoryFilterModal from "@/components/CategoryFilterModal";
 import ChecklistFilterModal from "@/components/ChecklistFilterModal";
 import CollectionOptionsSheet from "@/components/CollectionOptionsSheet";
 import CreateCollectionModal from "@/components/CreateCollectionModal";
-import EditFavoritesModal from "@/components/EditFavoritesModal";
 import { Colors } from "@/constants/theme";
 
 type FavoritesTab = "favoriler" | "koleksiyonlar";
@@ -75,7 +74,6 @@ export default function FavoritesScreen() {
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateCollectionOpen, setIsCreateCollectionOpen] = useState(false);
   const [renamingCollection, setRenamingCollection] = useState<Collection | null>(null);
   const [optionsCollection, setOptionsCollection] = useState<Collection | null>(null);
@@ -236,7 +234,7 @@ export default function FavoritesScreen() {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => setIsEditModalOpen(true)}
+                onPress={() => router.push("/edit-favorites")}
                 style={{ height: CHIP_HEIGHT, borderWidth: 1, borderColor: Colors.surfaceBorder }}
                 className="flex-row items-center gap-1.5 rounded-full bg-surface-card px-3"
               >
@@ -439,11 +437,6 @@ export default function FavoritesScreen() {
         options={EQUIPMENT_KEYS.map((key) => ({ key, label: EQUIPMENT_LABELS[key] }))}
         selected={selectedEquipment}
         onApply={setSelectedEquipment}
-      />
-      <EditFavoritesModal
-        visible={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onCollectionDone={(collectionId) => openCollection(collectionId)}
       />
       <CreateCollectionModal
         visible={isCreateCollectionOpen}
