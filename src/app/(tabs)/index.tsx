@@ -4,12 +4,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { Clock, MessageCircle, Star } from "lucide-react-native";
-import { Image } from "expo-image";
 import { useAppSelector } from "@/lib/redux/hooks";
 import { EQUIPMENT_LABELS } from "@/lib/redux/equipmentSlice";
 import { getCategoryLabel } from "@/lib/mealdb/categoryMeta";
 import { getHomeMealSections, type MealHomeSection } from "@/lib/api/client";
-import { getInitials } from "@/lib/initials";
 import { Colors } from "@/constants/theme";
 import IngredientPicker from "@/components/IngredientPicker";
 import CategoryNav from "@/components/CategoryNav";
@@ -28,8 +26,6 @@ export default function HomeScreen() {
   const router = useRouter();
   const isLoggedIn = useAppSelector((state) => state.auth.status === "authenticated");
   const storedName = useAppSelector((state) => state.userProfile.name);
-  const photoUri = useAppSelector((state) => state.userProfile.photoUri);
-  const email = useAppSelector((state) => state.auth.email);
   const name = isLoggedIn ? storedName : "";
   const history = useAppSelector((state) => state.history);
   const favorites = useAppSelector((state) => state.favorites);
@@ -88,28 +84,6 @@ export default function HomeScreen() {
             paddingBottom: 56,
           }}
         >
-          <Pressable
-            onPress={() => router.push("/profile")}
-            style={{
-              position: "absolute",
-              top: 14,
-              right: 14,
-              height: 36,
-              width: 36,
-              borderRadius: 18,
-              borderWidth: 1.5,
-              borderColor: "rgba(255,255,255,0.6)",
-              overflow: "hidden",
-            }}
-            className="items-center justify-center bg-white/20"
-          >
-            {photoUri ? (
-              <Image source={{ uri: photoUri }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
-            ) : (
-              <Text className="text-xs font-bold text-white">{getInitials(name, email)}</Text>
-            )}
-          </Pressable>
-
           <Text className="text-3xl font-bold text-white">CookSnap</Text>
           <Text className="text-center text-base text-white/90">
             {name ? `Merhaba, ${name}!` : "Merhaba!"} Dolabındaki malzemelerin fotoğrafını çek, öğrenci/ev

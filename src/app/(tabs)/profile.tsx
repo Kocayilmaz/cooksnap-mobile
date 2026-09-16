@@ -3,9 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, Share, Text, TextInput
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
 import {
-  ArrowLeft,
   Camera,
   ChevronDown,
   Globe,
@@ -66,15 +64,13 @@ function SettingsRow({
 }
 
 /**
- * Profil sayfası — ne-pisirsem'deki (web) profil/ayarlar panelinin mobil
+ * Profil sekmesi — ne-pisirsem'deki (web) profil/ayarlar panelinin mobil
  * karşılığı. Fotoğraf (yoksa isim baş harfleriyle bir avatar), isim, ülke,
  * "Profili Düzenle"/"Profili Paylaş" butonları ve altında bir Ayarlar
  * listesi: dil, yapay zeka anahtarı (premium mod), e-posta/şifre değişimi,
- * çıkış ve yardım. Anasayfadaki avatar butonundan açılıyor (bkz.
- * app/(tabs)/index.tsx).
+ * çıkış ve yardım. Alttaki 4. sekme (bkz. (tabs)/_layout.tsx).
  */
 export default function ProfileScreen() {
-  const router = useRouter();
   const dispatch = useAppDispatch();
   const { name, country, photoUri, language } = useAppSelector((state) => state.userProfile);
   const email = useAppSelector((state) => state.auth.email);
@@ -197,10 +193,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-surface-warm">
-      <View className="flex-row items-center gap-3 px-4 pt-2 pb-1">
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <ArrowLeft size={20} color={Colors.foreground} />
-        </Pressable>
+      <View className="px-4 pt-4 pb-1">
         <Text className="text-base font-bold text-foreground">Profil</Text>
       </View>
 
