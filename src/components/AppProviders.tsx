@@ -32,7 +32,7 @@ import { setHistory } from "@/lib/redux/historySlice";
 import { setMealFavorites } from "@/lib/redux/mealFavoritesSlice";
 import { setMealSearchHistory } from "@/lib/redux/mealSearchHistorySlice";
 import { setUsage, USAGE_RESET_INTERVAL_MS } from "@/lib/redux/usageCounterSlice";
-import { setName, setLanguage, setCountry } from "@/lib/redux/userProfileSlice";
+import { setName, setLanguage, setCountry, setPhotoUri } from "@/lib/redux/userProfileSlice";
 import { setAuthenticatedUser, setUnauthenticated } from "@/lib/redux/authSlice";
 import { subscribeToAuthState } from "@/lib/firebase/auth";
 
@@ -96,6 +96,7 @@ export default function AppProviders({ children }: { children: ReactNode }) {
         store.dispatch(setName(storedUserProfile.name));
         store.dispatch(setLanguage(storedUserProfile.language));
         store.dispatch(setCountry(storedUserProfile.country));
+        store.dispatch(setPhotoUri(storedUserProfile.photoUri ?? null));
       }
     })();
 

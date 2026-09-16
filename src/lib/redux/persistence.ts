@@ -1,7 +1,7 @@
 import { readJSON, writeJSON } from "@/lib/storage/asyncStorage";
 import { EQUIPMENT_KEYS, type Equipment } from "./equipmentSlice";
 import { RECIPE_MODE_KEYS } from "./recipeModeSlice";
-import type { PremiumProvider } from "./apiKeySlice";
+import { PREMIUM_PROVIDER_KEYS, type PremiumProvider } from "./apiKeySlice";
 import type { RecipeLanguage } from "./userProfileSlice";
 import type { FavoriteRecipe, FavoritesState } from "./favoritesSlice";
 import type { MealFavorite, MealFavoritesState } from "./mealFavoritesSlice";
@@ -24,7 +24,7 @@ interface StoredApiKey {
   key: string;
 }
 function isPremiumProvider(value: unknown): value is PremiumProvider {
-  return value === "claude" || value === "openai";
+  return typeof value === "string" && PREMIUM_PROVIDER_KEYS.includes(value as PremiumProvider);
 }
 function isStoredApiKey(value: unknown): value is StoredApiKey {
   if (typeof value !== "object" || value === null) return false;
@@ -199,6 +199,7 @@ interface StoredUserProfile {
   name: string;
   language: RecipeLanguage;
   country: string;
+  photoUri: string | null;
 }
 function isRecipeLanguage(value: unknown): value is RecipeLanguage {
   return value === "tr" || value === "en";
@@ -206,7 +207,12 @@ function isRecipeLanguage(value: unknown): value is RecipeLanguage {
 function isStoredUserProfile(value: unknown): value is StoredUserProfile {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Partial<StoredUserProfile>;
-  return typeof record.name === "string" && isRecipeLanguage(record.language) && typeof record.country === "string";
+  return (
+    typeof record.name === "string" &&
+    isRecipeLanguage(record.language) &&
+    typeof record.country === "string" &&
+    (record.photoUri === undefined || record.photoUri === null || typeof record.photoUri === "string")
+  );
 }
 export const readStoredUserProfile = () => readJSON(USER_PROFILE_STORAGE_KEY, isStoredUserProfile);
 export const writeStoredUserProfile = (value: StoredUserProfile) => writeJSON(USER_PROFILE_STORAGE_KEY, value);
