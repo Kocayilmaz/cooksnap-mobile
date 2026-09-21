@@ -1,49 +1,54 @@
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, TextInput, Vibration, View } from "react-native";
 import { Pause, Play, RotateCcw, Timer as TimerIcon } from "lucide-react-native";
+import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
+import { pauseTimer, resetTimer, setDurationSeconds, startTimer, tickTimer } from "@/lib/redux/cookingTimerSlice";
 import { clampMinutes, formatTimerDuration } from "@/lib/cookingTimerUtils";
 import { Colors } from "@/constants/theme";
 
 const PRESET_MINUTES = [5, 10, 20];
-const DEFAULT_MINUTES = PRESET_MINUTES[0];
 const MIN_MINUTES = 1;
 const MAX_MINUTES = 180;
 
 /** ne-pisirsem'deki components/SidebarCookingTimer.tsx'in mobil karşılığı —
  * daraltılmış (collapsed) hali yok, mobilde sidebar zaten ya tamamen açık ya
  * tamamen kapalı (bkz. ChatSidebarDrawer). Zil sesi yerine (Web Audio API RN'de
- * yok) süre dolunca kısa bir titreşim (Vibration.vibrate) kullanılıyor. */
+ * yok) süre dolunca kısa bir titreşim (Vibration.vibrate) kullanılıyor.
+ * Durum Redux'ta (bkz. cookingTimerSlice) tutuluyor ki bir tarif adımındaki
+ * "10 dk" butonuna basınca (bkz. RecipeMessageCard.tsx) bu widget'ı doğrudan
+ * güncelleyebilsin — bileşen kendi state'ini değil, o paylaşılan state'i okuyup
+ * her saniye tickTimer dispatch ediyor. */
 export default function SidebarCookingTimer() {
-  const [totalSeconds, setTotalSeconds] = useState(DEFAULT_MINUTES * 60);
-  const [remainingSeconds, setRemainingSeconds] = useState(DEFAULT_MINUTES * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [manualMinutes, setManualMinutes] = useState(String(DEFAULT_MINUTES));
+  const dispatch = useAppDispatch();
+  const { totalSeconds, remainingSeconds, isRunning } = useAppSelector((state) => state.cookingTimer);
+  const [manualMinutes, setManualMinutes] = useState(String(totalSeconds / 60));
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!isRunning) return;
 
     intervalRef.current = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev <= 1) {
-          setIsRunning(false);
-          Vibration.vibrate(400);
-          return 0;
-        }
-        return prev - 1;
-      });
+      dispatch(tickTimer());
     }, 1000);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isRunning]);
+  }, [isRunning, dispatch]);
+
+  const previousRemainingRef = useRef(remainingSeconds);
+  useEffect(() => {
+    if (previousRemainingRef.current > 0 && remainingSeconds === 0) Vibration.vibrate(400);
+    previousRemainingRef.current = remainingSeconds;
+  }, [remainingSeconds]);
+
+  useEffect(() => {
+    setManualMinutes(String(totalSeconds / 60));
+  }, [totalSeconds]);
 
   function applyMinutes(minutes: number) {
     const clamped = clampMinutes(minutes, MIN_MINUTES, MAX_MINUTES);
-    setTotalSeconds(clamped * 60);
-    setRemainingSeconds(clamped * 60);
-    setManualMinutes(String(clamped));
+    dispatch(setDurationSeconds(clamped * 60));
   }
 
   function handleSelectPreset(minutes: number) {
@@ -62,12 +67,11 @@ export default function SidebarCookingTimer() {
   }
 
   function handleToggle() {
-    setIsRunning((prev) => !prev);
+    dispatch(isRunning ? pauseTimer() : startTimer());
   }
 
   function handleReset() {
-    setIsRunning(false);
-    setRemainingSeconds(totalSeconds);
+    dispatch(resetTimer());
   }
 
   return (
