@@ -7,9 +7,16 @@ import { ArrowLeft, Heart, PlayCircle, Share2 } from "lucide-react-native";
 import { getMealDetail } from "@/lib/api/client";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { toggleMealFavorite } from "@/lib/redux/mealFavoritesSlice";
+import { startWithMinutes } from "@/lib/redux/cookingTimerSlice";
 import AddToCollectionSheet from "@/components/AddToCollectionSheet";
+import StepTimerCard from "@/components/StepTimerCard";
+import { clampMinutes, extractDurationMinutes } from "@/lib/cookingTimerUtils";
+import { splitInstructionsIntoSteps } from "@/lib/recipeText";
 import { Colors } from "@/constants/theme";
 import type { MealDetail } from "@/lib/types/meal";
+
+const MIN_TIMER_MINUTES = 1;
+const MAX_TIMER_MINUTES = 180;
 
 /**
  * ne-pisirsem'deki app/meal/[id]/page.tsx'in mobil karşılığı — kendi
@@ -26,6 +33,12 @@ export default function MealDetailScreen() {
   const [meal, setMeal] = useState<MealDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isAddToCollectionOpen, setIsAddToCollectionOpen] = useState(false);
+  const [activeStepIndex, setActiveStepIndex] = useState<number | null>(null);
+
+  function handleStartStepTimer(stepIndex: number, minutes: number) {
+    dispatch(startWithMinutes(clampMinutes(minutes, MIN_TIMER_MINUTES, MAX_TIMER_MINUTES)));
+    setActiveStepIndex(stepIndex);
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -102,21 +115,76 @@ export default function MealDetailScreen() {
               </Text>
             </View>
 
-            <View className="gap-2">
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: Colors.surfaceBorder,
+                borderRadius: 16,
+                backgroundColor: Colors.surfaceWarm,
+                padding: 14,
+                gap: 8,
+              }}
+            >
               <Text className="text-sm font-semibold text-foreground">Malzemeler</Text>
-              <View className="gap-1">
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                 {meal.ingredients.map((ingredient) => (
-                  <Text key={ingredient.name} className="text-sm text-surface-text-muted">
-                    {ingredient.measure ? `${ingredient.measure} ` : ""}
-                    {ingredient.name}
-                  </Text>
+                  <View
+                    key={ingredient.name}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: Colors.surfaceBorder,
+                      borderRadius: 999,
+                      backgroundColor: Colors.surfaceCard,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                    }}
+                  >
+                    <Text className="text-xs text-foreground">
+                      {ingredient.measure ? `${ingredient.measure} ` : ""}
+                      {ingredient.name}
+                    </Text>
+                  </View>
                 ))}
               </View>
             </View>
 
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">Hazırlanışı</Text>
-              <Text className="text-sm text-surface-text-muted">{meal.instructions}</Text>
+            <View className="gap-3">
+              <Text className="text-sm font-semibold text-foreground">Adım Adım Hazırlanışı</Text>
+              {splitInstructionsIntoSteps(meal.instructions).map((step, index) => {
+                const minutes = extractDurationMinutes(step);
+                return (
+                  <View key={index} style={{ position: "relative", paddingLeft: 30 }}>
+                    <View
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: 0,
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        borderWidth: 1,
+                        borderColor: Colors.brandOrange,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text style={{ color: Colors.brandOrangeDark, fontSize: 11 }} className="font-bold">
+                        {index + 1}
+                      </Text>
+                    </View>
+                    <Text className="text-sm text-surface-text-muted">{step}</Text>
+                    {minutes !== null && (
+                      <View style={{ marginTop: 6 }}>
+                        <StepTimerCard
+                          minutes={minutes}
+                          isActive={activeStepIndex === index}
+                          onStart={() => handleStartStepTimer(index, minutes)}
+                        />
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
 
             {meal.youtubeVideoId && (
