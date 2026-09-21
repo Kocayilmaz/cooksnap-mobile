@@ -106,7 +106,10 @@ export default function ChatScreen() {
   const userProfile = useAppSelector((state) => state.userProfile);
   const usageCount = useAppSelector((state) => state.usageCounter.count);
   const history = useAppSelector((state) => state.history);
-  const isFreeMode = true;
+  const apiKey = useAppSelector((state) => state.apiKey);
+  // Profilde premium bir API anahtarı kaydedilmişse ücretsiz mod limiti
+  // uygulanmaz — bkz. callApi'de premiumProvider/premiumApiKey'in isteğe eklenmesi.
+  const isFreeMode = !apiKey.key;
   const limitReached = isFreeMode && usageCount >= FREE_USAGE_LIMIT;
 
   const [photo, setPhoto] = useState<string | null>(null);
@@ -203,6 +206,7 @@ export default function ChatScreen() {
       mode: recipeMode,
       language: userProfile.language,
       country: userProfile.country.trim() || undefined,
+      ...(apiKey.key ? { premiumProvider: apiKey.provider, premiumApiKey: apiKey.key } : {}),
     });
 
     dispatch(incrementUsage());
@@ -469,7 +473,9 @@ export default function ChatScreen() {
                       <Text className="text-sm text-foreground">{message.text}</Text>
                     </View>
                   )}
-                  {message.recipes?.map((recipe, index) => <RecipeMessageCard key={index} recipe={recipe} />)}
+                  {message.recipes?.map((recipe, index) => (
+                    <RecipeMessageCard key={index} recipe={recipe} onStartTimer={() => setIsSidebarOpen(true)} />
+                  ))}
                   {(message.text || (message.recipes && message.recipes.length > 0)) && (
                     <ChatMessageActions
                       recipes={message.recipes}
@@ -639,9 +645,13 @@ export default function ChatScreen() {
               <Text className="text-center text-xs text-state-error">
                 Ücretsiz mod limitine ulaştın ({usageCount}/{FREE_USAGE_LIMIT}).
               </Text>
-            ) : (
+            ) : isFreeMode ? (
               <Text className="text-center text-xs text-surface-text-muted">
                 Ücretsiz modda kullanılan istek: {usageCount}/{FREE_USAGE_LIMIT}
+              </Text>
+            ) : (
+              <Text className="text-center text-xs text-surface-text-muted">
+                Premium mod aktif ({apiKey.provider}).
               </Text>
             )}
 
